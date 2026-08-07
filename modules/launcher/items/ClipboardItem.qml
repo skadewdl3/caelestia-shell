@@ -4,6 +4,7 @@ import QtQuick
 import Quickshell.Io
 import Caelestia.Config
 import qs.components
+import qs.components.controls
 import qs.services
 
 Item {
@@ -15,6 +16,7 @@ Item {
     property bool previewRequested
     property bool previewReady
     property string previewId
+    readonly property bool hovered: hoverHandler.hovered
 
     function preparePreview(): void {
         if (!root.modelData?.image || previewRequested)
@@ -38,6 +40,46 @@ Item {
         preparePreview();
     }
 
+    ListView.onRemove: {
+        if (root.list.state === "clip")
+            removeAnim.start();
+    }
+
+    SequentialAnimation {
+        id: removeAnim
+
+        PropertyAction {
+            target: root
+            property: "ListView.delayRemove"
+            value: true
+        }
+        PropertyAction {
+            target: root
+            property: "enabled"
+            value: false
+        }
+        ParallelAnimation {
+            Anim {
+                target: root
+                property: "opacity"
+                to: 0
+                type: Anim.DefaultEffects
+            }
+            Anim {
+                target: root
+                property: "implicitHeight"
+                to: 0
+                duration: Tokens.anim.durations.normal
+                easing: Tokens.anim.emphasized
+            }
+        }
+        PropertyAction {
+            target: root
+            property: "ListView.delayRemove"
+            value: false
+        }
+    }
+
     Process {
         id: previewProcess
 
@@ -46,6 +88,10 @@ Item {
             if (root.modelData?.id === root.previewId)
                 root.previewReady = exitCode === 0;
         }
+    }
+
+    HoverHandler {
+        id: hoverHandler
     }
 
     StateLayer {
@@ -69,7 +115,8 @@ Item {
         Item {
             anchors.left: leading.right
             anchors.leftMargin: Tokens.spacing.medium
-            anchors.right: parent.right
+            anchors.right: actions.left
+            anchors.rightMargin: Tokens.spacing.small
             anchors.verticalCenter: parent.verticalCenter
 
             implicitHeight: title.implicitHeight + detail.implicitHeight
@@ -92,6 +139,55 @@ Item {
                 font: Tokens.font.body.small
                 color: Colours.palette.m3outline
                 elide: Text.ElideRight
+            }
+        }
+
+        Row {
+            id: actions
+
+            anchors.right: parent.right
+            anchors.verticalCenter: parent.verticalCenter
+
+            spacing: Tokens.spacing.extraSmall
+
+            IconButton {
+                type: IconButton.Text
+                isRound: true
+                icon: "delete"
+                inactiveOnColour: Colours.palette.m3error
+                font: Tokens.font.icon.medium
+                label.fill: 0
+                opacity: root.hovered ? 1 : 0
+                enabled: root.hovered
+
+                onClicked: Clipboard.deleteEntry(root.modelData)
+
+                Behavior on opacity {
+                    Anim {
+                        type: Anim.DefaultEffects
+                    }
+                }
+            }
+
+            IconButton {
+                id: pinButton
+
+                type: IconButton.Text
+                isToggle: true
+                isRound: true
+                checked: root.modelData?.pinned ?? false
+                icon: "star"
+                font: Tokens.font.icon.medium
+                opacity: root.hovered || pinButton.checked ? 1 : 0
+                enabled: root.hovered || pinButton.checked
+
+                onClicked: Clipboard.togglePinned(root.modelData)
+
+                Behavior on opacity {
+                    Anim {
+                        type: Anim.DefaultEffects
+                    }
+                }
             }
         }
     }

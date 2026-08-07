@@ -102,6 +102,7 @@ StyledListView {
 
         Behavior on y {
             enabled: !root.fastList
+
             Anim {}
         }
     }

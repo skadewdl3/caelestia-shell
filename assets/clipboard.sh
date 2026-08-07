@@ -17,6 +17,12 @@ case "$action" in
         mime=${3:-text/plain;charset=utf-8}
         cliphist decode "$id" | wl-copy --type "$mime"
         ;;
+    delete)
+        case "$id" in
+            '' | *[!0-9]*) exit 2 ;;
+        esac
+        printf '%s\n' "$id" | cliphist delete
+        ;;
     preview)
         case "$id" in
             '' | *[!0-9]*) exit 2 ;;
