@@ -6,6 +6,7 @@ import Caelestia.Config
 import qs.components
 import qs.components.controls
 import qs.services
+import qs.services as Services
 import qs.modules.launcher.services
 
 Item {
@@ -17,6 +18,40 @@ Item {
 
     readonly property int padding: Tokens.padding.large
     readonly property int rounding: Tokens.rounding.extraLarge
+
+    function applyLauncherQuery(): void {
+        const query = root.screenState.launcherQuery;
+        if (!query)
+            return;
+
+        search.text = query;
+        root.screenState.launcherQuery = "";
+        search.forceActiveFocus();
+    }
+
+    function activateCurrentItem(): void {
+        const currentItem = list.currentList?.currentItem;
+        if (currentItem) {
+            if (list.showWallpapers) {
+                if (Colours.scheme === "dynamic" && currentItem.modelData.path !== Wallpapers.actualCurrent)
+                    Wallpapers.previewColourLock = true;
+                Wallpapers.setWallpaper(currentItem.modelData.path);
+                root.screenState.launcher = false;
+            } else if (search.text.startsWith(GlobalConfig.launcher.actionPrefix)) {
+                if (search.text.startsWith(`${GlobalConfig.launcher.actionPrefix}calc `))
+                    currentItem.onClicked();
+                else if (list.showClips)
+                    Services.Clipboard.activate(currentItem.modelData, list.currentList);
+                else if (list.showEmojis)
+                    Services.Emojis.activate(currentItem.modelData, list.currentList);
+                else
+                    currentItem.modelData.onClicked(list.currentList);
+            } else {
+                Apps.launch(currentItem.modelData);
+                root.screenState.launcher = false;
+            }
+        }
+    }
 
     implicitWidth: listWrapper.width + padding * 2
     implicitHeight: search.height + listWrapper.height + padding + search.anchors.bottomMargin
@@ -61,23 +96,13 @@ Item {
         placeholderText: qsTr("Type \"%1\" for commands").arg(GlobalConfig.launcher.actionPrefix)
 
         onAccepted: {
-            const currentItem = list.currentList?.currentItem;
-            if (currentItem) {
-                if (list.showWallpapers) {
-                    if (Colours.scheme === "dynamic" && currentItem.modelData.path !== Wallpapers.actualCurrent)
-                        Wallpapers.previewColourLock = true;
-                    Wallpapers.setWallpaper(currentItem.modelData.path);
-                    root.screenState.launcher = false;
-                } else if (text.startsWith(GlobalConfig.launcher.actionPrefix)) {
-                    if (text.startsWith(`${GlobalConfig.launcher.actionPrefix}calc `))
-                        currentItem.onClicked();
-                    else
-                        currentItem.modelData.onClicked(list.currentList);
-                } else {
-                    Apps.launch(currentItem.modelData);
-                    root.screenState.launcher = false;
-                }
+            const currentList = list.currentList;
+            if (currentList && typeof currentList.flushSearch === "function" && currentList.flushSearch()) {
+                Qt.callLater(root.activateCurrentItem);
+                return;
             }
+
+            root.activateCurrentItem();
         }
 
         Keys.onUpPressed: list.currentList?.decrementCurrentIndex()
@@ -106,12 +131,22 @@ Item {
             }
         }
 
-        Component.onCompleted: forceActiveFocus()
+        Component.onCompleted: {
+            root.applyLauncherQuery();
+            forceActiveFocus();
+        }
 
         Connections {
             function onLauncherChanged(): void {
                 if (!root.screenState.launcher)
                     search.text = "";
+                else
+                    root.applyLauncherQuery();
+            }
+
+            function onLauncherQueryChanged(): void {
+                if (root.screenState.launcher)
+                    root.applyLauncherQuery();
             }
 
             function onSessionChanged(): void {

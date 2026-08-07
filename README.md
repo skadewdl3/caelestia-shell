@@ -90,6 +90,8 @@ Dependencies:
 -   [`material-symbols`](https://fonts.google.com/icons)
 -   [`caskaydia-cove-nerd`](https://www.nerdfonts.com/font-downloads)
 -   [`swappy`](https://github.com/jtheoof/swappy)
+-   [`cliphist`](https://github.com/sentriz/cliphist)
+-   [`wl-clipboard`](https://github.com/bugaevc/wl-clipboard)
 -   [`libqalculate`](https://github.com/Qalculate/libqalculate)
 -   [`bash`](https://www.gnu.org/software/bash)
 -   `qt6-base`
@@ -141,6 +143,40 @@ All keybinds are accessible via Hyprland [global shortcuts](https://wiki.hyprlan
 If using the entire caelestia dots, the keybinds are already configured for you.
 Otherwise, [this file](https://github.com/caelestia-dots/caelestia/blob/main/hypr/hyprland/keybinds.conf#L1-L39)
 contains an example on how to use global shortcuts.
+
+### greetd greeter
+
+This fork also ships a separate Caelestia greeter for `greetd`. It is a dedicated
+Quickshell entry point and does not start the authenticated desktop shell or load
+user-session services before login.
+
+The default CMake build installs the greeter. On Nix, use the `with-greeter` or
+`with-cli-and-greeter` package output. You also need `greetd`, Cage, UWSM, and a
+Quickshell build with `Quickshell.Services.Greetd`.
+
+After installing the package:
+
+1. Copy `config.example` from the installed Caelestia greeter data directory to
+   `/etc/caelestia-greeter/config` and set `CAELESTIA_GREETER_USER`.
+2. Review `greetd-config.toml` from the same directory and merge the relevant
+   values into `/etc/greetd/config.toml`. Do not overwrite an existing display
+   manager configuration without reviewing it.
+3. Create the isolated runtime directories with
+   `systemd-tmpfiles --create caelestia-greeter.conf`.
+4. Enable `greetd.service` only after confirming that you have a working recovery
+   path from another VT.
+
+The greeter defaults to the packaged wallpaper. Set
+`CAELESTIA_GREETER_BACKGROUND` in the system config to use another
+system-readable image. It launches `hyprland.desktop` through UWSM by default;
+`CAELESTIA_GREETER_SESSION_DESKTOP` can select a different installed desktop
+entry.
+
+For a safe desktop preview from a source checkout:
+
+```sh
+CAELESTIA_GREETER_USER="$USER" qs -p ./greeter.qml
+```
 
 All IPC commands can be accessed via `caelestia shell ...`. For example
 

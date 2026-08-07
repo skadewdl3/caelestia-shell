@@ -36,10 +36,12 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
 
 set(DISTRIBUTOR "Unset" CACHE STRING "Distributor")
-set(ENABLE_MODULES "extras;plugin;shell;m3shapes" CACHE STRING "Modules to build/install")
+set(ENABLE_MODULES "extras;plugin;shell;greeter;m3shapes" CACHE STRING "Modules to build/install")
 set(INSTALL_LIBDIR "${CMAKE_INSTALL_LIBDIR}/caelestia" CACHE STRING "Library install dir")
 set(INSTALL_QMLDIR "${CMAKE_INSTALL_LIBDIR}/qt6/qml" CACHE STRING "QML install dir")
 set(INSTALL_QSCONFDIR "${CMAKE_INSTALL_SYSCONFDIR}/xdg/quickshell/caelestia" CACHE STRING "Quickshell config install dir")
+set(INSTALL_GREETER_QSCONFDIR "${CMAKE_INSTALL_DATADIR}/caelestia-greeter" CACHE STRING "Greeter Quickshell config install dir")
+set(INSTALL_GREETER_LIBEXECDIR "${CMAKE_INSTALL_LIBEXECDIR}/caelestia-greeter" CACHE STRING "Greeter helper install dir")
 
 add_compile_options(
     -Wall -Wextra -Wpedantic -Wshadow -Wconversion
@@ -74,6 +76,51 @@ if("shell" IN_LIST ENABLE_MODULES)
     install(FILES "${CMAKE_BINARY_DIR}/qml/shell.qml" DESTINATION "${INSTALL_QSCONFDIR}")
 
     install(FILES LICENSE DESTINATION "${INSTALL_QSCONFDIR}")
+endif()
+
+if("greeter" IN_LIST ENABLE_MODULES)
+    if(IS_ABSOLUTE "${INSTALL_GREETER_QSCONFDIR}")
+        set(GREETER_QSCONFDIR "${INSTALL_GREETER_QSCONFDIR}")
+    else()
+        set(GREETER_QSCONFDIR "${CMAKE_INSTALL_PREFIX}/${INSTALL_GREETER_QSCONFDIR}")
+    endif()
+
+    if(IS_ABSOLUTE "${INSTALL_GREETER_LIBEXECDIR}")
+        set(GREETER_LIBEXECDIR "${INSTALL_GREETER_LIBEXECDIR}")
+    else()
+        set(GREETER_LIBEXECDIR "${CMAKE_INSTALL_PREFIX}/${INSTALL_GREETER_LIBEXECDIR}")
+    endif()
+
+    configure_file(
+        packaging/greetd/caelestia-greeter.in
+        "${CMAKE_BINARY_DIR}/caelestia-greeter"
+        @ONLY
+    )
+
+    install(PROGRAMS "${CMAKE_BINARY_DIR}/caelestia-greeter" DESTINATION "${CMAKE_INSTALL_BINDIR}")
+    install(PROGRAMS
+        packaging/greetd/start-session
+        packaging/greetd/system-info
+        DESTINATION "${INSTALL_GREETER_LIBEXECDIR}"
+    )
+    install(FILES
+        greeter.qml
+        LICENSE
+        DESTINATION "${INSTALL_GREETER_QSCONFDIR}"
+    )
+    install(FILES modules/GSFLoader.qml DESTINATION "${INSTALL_GREETER_QSCONFDIR}/modules")
+    install(DIRECTORY modules/greeter DESTINATION "${INSTALL_GREETER_QSCONFDIR}/modules")
+    install(DIRECTORY assets/google-sans-flex DESTINATION "${INSTALL_GREETER_QSCONFDIR}/assets")
+    install(FILES assets/wallpaper.webp DESTINATION "${INSTALL_GREETER_QSCONFDIR}/assets")
+    install(FILES
+        packaging/greetd/config.example
+        packaging/greetd/greetd-config.toml
+        DESTINATION "${INSTALL_GREETER_QSCONFDIR}"
+    )
+    install(FILES packaging/greetd/caelestia-greeter.tmpfiles
+        DESTINATION "${CMAKE_INSTALL_LIBDIR}/tmpfiles.d"
+        RENAME caelestia-greeter.conf
+    )
 endif()
 
 if("m3shapes" IN_LIST ENABLE_MODULES)
