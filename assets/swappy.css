@@ -89,7 +89,7 @@ paned {
 }
 
 paned > box {
-    margin: 12px 6px 12px 12px;
+    margin: 6px 12px 12px;
     padding: 6px;
     background-color: @caelestia_surface_container;
     border: 1px solid @caelestia_outline_variant;
@@ -98,8 +98,8 @@ paned > box {
 
 /* The drawing tools become a tonal, rounded Material tool rail. */
 .drawing {
-    margin: 10px;
-    padding: 5px;
+    margin: 2px;
+    padding: 4px;
     background-color: @caelestia_surface_container_high;
     border-radius: 18px;
 }
@@ -127,10 +127,14 @@ paned > box {
 }
 
 .color-box {
-    margin: 4px 10px;
+    margin: 2px 4px;
     padding: 4px;
     background-color: @caelestia_surface_container_high;
     border-radius: 999px;
+}
+
+.caelestia-tool-row {
+    margin: 1px;
 }
 
 .color-box button {
