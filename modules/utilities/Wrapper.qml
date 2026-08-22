@@ -15,11 +15,8 @@ Item {
     required property Sidebar.Wrapper sidebar
     required property BarPopouts.Wrapper popouts
     property real horizontalStretch
-    property matrix4x4 deformMatrix
 
     readonly property PersistentProperties props: PersistentProperties {
-        property bool recordingListExpanded: false
-        property string recordingConfirmDelete
         property string recordingMode
 
         reloadableId: "utilities"
@@ -85,7 +82,6 @@ Item {
             props: root.props
             screenState: root.screenState
             popouts: root.popouts
-            deformMatrix: root.deformMatrix
         }
     }
 }
