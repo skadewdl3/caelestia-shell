@@ -1,10 +1,14 @@
+// qmllint disable unused-imports
 import QtQuick
 import Quickshell
 import Quickshell.Io
 import Caelestia
+import Caelestia.Config as CConfig
 import qs.components.misc
 import qs.services
 import qs.modules.nexus
+
+// qmllint enable unused-imports
 
 Scope {
     id: root
@@ -80,6 +84,20 @@ Scope {
         name: "launcherInterrupt"
         description: "Interrupt launcher keybind"
         onPressed: root.launcherInterrupted = true
+    }
+
+    // qmllint disable unresolved-type
+    CustomShortcut {
+        // qmllint enable unresolved-type
+        name: "clipboard"
+        description: "Open clipboard history"
+        onPressed: {
+            if (root.hasFullscreen)
+                return;
+            const screenState = ShellState.forActive();
+            screenState.launcherQuery = `${CConfig.GlobalConfig.launcher.actionPrefix}clip `;
+            screenState.launcher = true;
+        }
     }
 
     // qmllint disable unresolved-type

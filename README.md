@@ -90,6 +90,8 @@ Dependencies:
 -   [`material-symbols`](https://fonts.google.com/icons)
 -   [`caskaydia-cove-nerd`](https://www.nerdfonts.com/font-downloads)
 -   [`swappy`](https://github.com/jtheoof/swappy)
+-   [`cliphist`](https://github.com/sentriz/cliphist)
+-   [`wl-clipboard`](https://github.com/bugaevc/wl-clipboard)
 -   [`libqalculate`](https://github.com/Qalculate/libqalculate)
 -   [`bash`](https://www.gnu.org/software/bash)
 -   `qt6-base`

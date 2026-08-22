@@ -20,10 +20,20 @@ StyledListView {
 
     readonly property string requestedState: stateForText(search.text)
     readonly property string displayState: stateForText(displayText)
+    readonly property bool fastList: state === "clip"
 
     function syncDisplayText(): void {
-        if (screenState.launcher && requestedState === displayState)
-            displayText = search.text;
+        if (screenState.launcher && requestedState === displayState && displayText !== search.text)
+            searchThrottle.restart();
+    }
+
+    function flushSearch(): bool {
+        if (!searchThrottle.running)
+            return false;
+
+        searchThrottle.stop();
+        displayText = search.text;
+        return true;
     }
 
     function stateForText(text: string): string {
@@ -32,6 +42,9 @@ StyledListView {
             for (const action of ["calc", "scheme", "variant"])
                 if (text.startsWith(`${prefix}${action} `))
                     return action;
+
+            if (text === `${prefix}clip` || text.startsWith(`${prefix}clip `))
+                return "clip";
 
             return "actions";
         }
@@ -45,6 +58,8 @@ StyledListView {
             return Actions.query(text);
         case "calc":
             return [0];
+        case "clip":
+            return Clips.query(text);
         case "scheme":
             return Schemes.query(text);
         case "variant":
@@ -61,6 +76,8 @@ StyledListView {
 
     spacing: Tokens.spacing.small
     orientation: Qt.Vertical
+    reuseItems: true
+    cacheBuffer: fastList ? (Tokens.sizes.launcher.itemHeight + spacing) * Config.launcher.maxShown * 2 : 0
     implicitHeight: (Tokens.sizes.launcher.itemHeight + spacing) * Math.min(Config.launcher.maxShown, count) - spacing
 
     preferredHighlightBegin: 0
@@ -78,6 +95,8 @@ StyledListView {
         implicitHeight: root.currentItem?.implicitHeight ?? 0
 
         Behavior on y {
+            enabled: !root.fastList
+
             Anim {}
         }
     }
@@ -85,7 +104,9 @@ StyledListView {
     state: screenState.launcher ? requestedState : displayState
 
     onStateChanged: {
-        if (state === "scheme" || state === "variant")
+        if (state === "clip")
+            Clipboard.reload();
+        else if (state === "scheme" || state === "variant")
             Schemes.reload();
     }
 
@@ -111,6 +132,13 @@ StyledListView {
 
             PropertyChanges {
                 root.delegate: calcItem
+            }
+        },
+        State {
+            name: "clip"
+
+            PropertyChanges {
+                root.delegate: clipboardItem
             }
         },
         State {
@@ -155,7 +183,10 @@ StyledListView {
                 value: null
             }
             ScriptAction {
-                script: root.displayText = root.search.text
+                script: {
+                    searchThrottle.stop();
+                    root.displayText = root.search.text;
+                }
             }
             PropertyAction {
                 target: root
@@ -214,6 +245,8 @@ StyledListView {
     }
 
     move: Transition {
+        enabled: !root.fastList
+
         Anim {
             property: "y"
         }
@@ -225,6 +258,8 @@ StyledListView {
     }
 
     addDisplaced: Transition {
+        enabled: !root.fastList
+
         Anim {
             property: "y"
             type: Anim.StandardSmall
@@ -237,6 +272,8 @@ StyledListView {
     }
 
     displaced: Transition {
+        enabled: !root.fastList
+
         Anim {
             property: "y"
         }
@@ -272,6 +309,14 @@ StyledListView {
     }
 
     Component {
+        id: clipboardItem
+
+        ClipboardItem {
+            list: root
+        }
+    }
+
+    Component {
         id: schemeItem
 
         SchemeItem {
@@ -287,6 +332,16 @@ StyledListView {
         }
     }
 
+    Timer {
+        id: searchThrottle
+
+        interval: 80
+        onTriggered: {
+            if (root.screenState.launcher && root.requestedState === root.displayState)
+                root.displayText = root.search.text;
+        }
+    }
+
     Connections {
         function onTextChanged() {
             root.syncDisplayText();
@@ -297,7 +352,10 @@ StyledListView {
 
     Connections {
         function onLauncherChanged() {
-            root.syncDisplayText();
+            if (root.screenState.launcher) {
+                searchThrottle.stop();
+                root.displayText = root.search.text;
+            }
         }
 
         target: root.screenState
