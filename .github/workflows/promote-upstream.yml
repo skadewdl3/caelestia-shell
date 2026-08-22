@@ -1,0 +1,88 @@
+name: Promote upstream update
+
+on:
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: "The tested upstream-update PR number"
+        required: true
+        type: string
+
+concurrency:
+  group: upstream-release-promotion
+  cancel-in-progress: false
+
+permissions:
+  checks: read
+  contents: write
+  pull-requests: write
+  statuses: read
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Validate PR and checks
+        id: pr
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ inputs.pr_number }}
+        run: |
+          [[ "$PR_NUMBER" =~ ^[0-9]+$ ]]
+          pr=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER")
+          state=$(jq -r '.state' <<< "$pr")
+          base_ref=$(jq -r '.base.ref' <<< "$pr")
+          head_ref=$(jq -r '.head.ref' <<< "$pr")
+          head_sha=$(jq -r '.head.sha' <<< "$pr")
+          head_repo=$(jq -r '.head.repo.full_name' <<< "$pr")
+
+          [[ "$state" == "open" ]]
+          [[ "$base_ref" == "main" ]]
+          [[ "$head_repo" == "$GITHUB_REPOSITORY" ]]
+          [[ "$head_ref" =~ ^update/v[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          gh pr checks "$PR_NUMBER"
+
+          echo "head_ref=$head_ref" >> "$GITHUB_OUTPUT"
+          echo "head_sha=$head_sha" >> "$GITHUB_OUTPUT"
+          echo "target_tag=${head_ref#update/}" >> "$GITHUB_OUTPUT"
+
+      - name: Verify and promote the exact tested commit
+        env:
+          HEAD_REF: ${{ steps.pr.outputs.head_ref }}
+          HEAD_SHA: ${{ steps.pr.outputs.head_sha }}
+          TARGET_TAG: ${{ steps.pr.outputs.target_tag }}
+        run: |
+          git remote add upstream https://github.com/caelestia-dots/shell.git
+          git fetch --quiet origin \
+            "+refs/heads/main:refs/remotes/origin/main" \
+            "+refs/heads/$HEAD_REF:refs/remotes/origin/$HEAD_REF"
+          git fetch --quiet upstream "refs/tags/$TARGET_TAG:refs/tags/$TARGET_TAG"
+
+          [[ "$(git rev-parse "origin/$HEAD_REF")" == "$HEAD_SHA" ]]
+          git merge-base --is-ancestor "$TARGET_TAG^{commit}" "$HEAD_SHA"
+
+          old_sha=$(git rev-parse origin/main)
+          archive_ref="archive/pre-$TARGET_TAG"
+          if git ls-remote --exit-code --heads origin "refs/heads/$archive_ref" >/dev/null; then
+            printf 'archive branch %s already exists; refusing to overwrite it\n' "$archive_ref" >&2
+            exit 1
+          fi
+
+          git push origin "$old_sha:refs/heads/$archive_ref"
+          git push --force-with-lease="refs/heads/main:$old_sha" origin "$HEAD_SHA:refs/heads/main"
+
+      - name: Close PR and remove the update branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ inputs.pr_number }}
+          HEAD_REF: ${{ steps.pr.outputs.head_ref }}
+        run: |
+          gh pr comment "$PR_NUMBER" --body "Promoted the exact tested commit to main with force-with-lease."
+          gh pr close "$PR_NUMBER" || true
+          git push origin --delete "$HEAD_REF"

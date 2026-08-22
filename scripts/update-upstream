@@ -1,0 +1,161 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+readonly DEFAULT_UPSTREAM_URL="https://github.com/caelestia-dots/shell.git"
+readonly UPSTREAM_URL="${CAELESTIA_UPSTREAM_URL:-$DEFAULT_UPSTREAM_URL}"
+readonly UPSTREAM_REMOTE="${CAELESTIA_UPSTREAM_REMOTE:-upstream}"
+
+check_only=false
+ci_mode=false
+target_tag=""
+
+usage() {
+    cat <<'EOF'
+Usage: scripts/update-upstream [--check] [--ci] [vX.Y.Z]
+
+Prepare a branch that rebases the custom main branch onto an upstream release.
+
+  --check  Report whether an update exists without creating a branch.
+  --ci     Abort a conflicted rebase after reporting its paths.
+  vX.Y.Z   Target this release instead of upstream/stable.
+EOF
+}
+
+die() {
+    printf 'update-upstream: %s\n' "$*" >&2
+    exit 1
+}
+
+set_output() {
+    local key=$1
+    local value=$2
+
+    if [[ -n "${GITHUB_OUTPUT:-}" ]]; then
+        printf '%s=%s\n' "$key" "$value" >> "$GITHUB_OUTPUT"
+    fi
+}
+
+while (($#)); do
+    case "$1" in
+        --check)
+            check_only=true
+            ;;
+        --ci)
+            ci_mode=true
+            ;;
+        -h | --help)
+            usage
+            exit 0
+            ;;
+        v[0-9]*.[0-9]*.[0-9]*)
+            [[ -z "$target_tag" ]] || die "only one release tag may be specified"
+            target_tag=$1
+            ;;
+        *)
+            usage >&2
+            die "unknown argument: $1"
+            ;;
+    esac
+    shift
+done
+
+[[ "$target_tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ || -z "$target_tag" ]] ||
+    die "release tags must use the stable vX.Y.Z form"
+
+repo_root=$(git rev-parse --show-toplevel 2>/dev/null) || die "not inside a Git repository"
+cd "$repo_root"
+
+current_branch=$(git symbolic-ref --quiet --short HEAD) || die "HEAD must be attached to main"
+[[ "$current_branch" == "main" ]] || die "run this command from main, not $current_branch"
+[[ -z "$(git status --porcelain=v1)" ]] || die "the worktree and index must be clean"
+
+if ! git remote get-url "$UPSTREAM_REMOTE" >/dev/null 2>&1; then
+    git remote add "$UPSTREAM_REMOTE" "$UPSTREAM_URL"
+else
+    configured_url=$(git remote get-url "$UPSTREAM_REMOTE")
+    if [[ "$configured_url" != "$UPSTREAM_URL" ]]; then
+        if [[ "$UPSTREAM_URL" != "$DEFAULT_UPSTREAM_URL" || "$configured_url" != "git@github.com:caelestia-dots/shell.git" ]]; then
+            die "remote $UPSTREAM_REMOTE points at unexpected URL $configured_url"
+        fi
+    fi
+fi
+
+stable_ref="refs/remotes/$UPSTREAM_REMOTE/stable"
+git fetch --quiet "$UPSTREAM_REMOTE" \
+    "+refs/heads/stable:$stable_ref" \
+    "refs/tags/v*:refs/tags/v*"
+
+stable_commit=$(git rev-parse "$stable_ref^{commit}")
+
+if [[ -z "$target_tag" ]]; then
+    while IFS= read -r candidate; do
+        if [[ "$candidate" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            target_tag=$candidate
+        fi
+    done < <(git tag --points-at "$stable_commit" --list 'v[0-9]*' | sort -V)
+
+    [[ -n "$target_tag" ]] || die "$UPSTREAM_REMOTE/stable does not point at a stable vX.Y.Z tag"
+fi
+
+target_commit=$(git rev-parse "refs/tags/$target_tag^{commit}" 2>/dev/null) ||
+    die "release tag $target_tag was not fetched from $UPSTREAM_REMOTE"
+
+if [[ "$target_commit" != "$stable_commit" && -z "${CAELESTIA_ALLOW_NON_STABLE_TARGET:-}" ]]; then
+    die "$target_tag is not the release currently selected by $UPSTREAM_REMOTE/stable"
+fi
+
+current_tag=$(git describe --tags --match 'v[0-9]*' --abbrev=0 HEAD 2>/dev/null) ||
+    die "main is not based on a fetched upstream release tag"
+[[ "$current_tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] ||
+    die "current base $current_tag is not a stable vX.Y.Z tag"
+
+update_branch="update/$target_tag"
+set_output current_tag "$current_tag"
+set_output target_tag "$target_tag"
+set_output update_branch "$update_branch"
+
+if [[ "$current_tag" == "$target_tag" ]]; then
+    set_output updated false
+    printf 'main is already based on %s\n' "$target_tag"
+    exit 0
+fi
+
+git merge-base --is-ancestor "$current_tag^{commit}" "$target_commit" ||
+    die "$target_tag is not a descendant of the current base $current_tag"
+
+set_output updated true
+
+if $check_only; then
+    printf 'update available: %s -> %s (%s)\n' "$current_tag" "$target_tag" "$update_branch"
+    exit 0
+fi
+
+if git show-ref --verify --quiet "refs/heads/$update_branch"; then
+    die "local branch $update_branch already exists"
+fi
+
+git switch --quiet --create "$update_branch"
+
+if git rebase --onto "$target_tag" "$current_tag"; then
+    head_sha=$(git rev-parse HEAD)
+    set_output head_sha "$head_sha"
+    set_output conflicted false
+    printf 'prepared %s at %s\n' "$update_branch" "$head_sha"
+    printf 'review and test it; do not merge it into main with a normal merge commit\n'
+    exit 0
+fi
+
+conflict_files=$(git diff --name-only --diff-filter=U | paste -sd ',' -)
+set_output conflicted true
+set_output conflict_files "$conflict_files"
+printf 'rebase onto %s conflicted in: %s\n' "$target_tag" "${conflict_files:-unknown paths}" >&2
+
+if $ci_mode; then
+    git rebase --abort
+    git switch --quiet main
+    exit 20
+fi
+
+printf 'resolve the files, git add them, and run git rebase --continue; or run git rebase --abort\n' >&2
+exit 20

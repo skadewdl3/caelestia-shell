@@ -16,6 +16,11 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - name: Test upstream update tooling
+        run: |
+          bash -n scripts/update-upstream scripts/test-update-upstream
+          scripts/test-update-upstream
+
       - name: Build
         run: |
           # Set version and git rev for CI build so we don't call git
