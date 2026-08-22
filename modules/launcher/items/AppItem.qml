@@ -35,9 +35,14 @@ Item {
         IconImage {
             id: icon
 
-            asynchronous: true
-            source: Quickshell.iconPath(root.modelData?.icon, "image-missing")
-            implicitSize: parent.height * 0.8
+            readonly property real iconSize: (root.implicitHeight - Tokens.padding.small * 2) * 0.8
+
+            implicitSize: iconSize
+            width: iconSize
+            height: iconSize
+            // Theme icon engines may access GUI-thread-only platform objects.
+            asynchronous: false
+            source: width > 0 && height > 0 ? Quickshell.iconPath(root.modelData?.icon, "image-missing") : ""
 
             anchors.verticalCenter: parent.verticalCenter
         }
