@@ -48,6 +48,11 @@
         m3shapes = inputs.m3shapes.packages.${system}.default;
       };
       with-cli = caelestia-shell.override {withCli = true;};
+      with-greeter = caelestia-shell.override {withGreeter = true;};
+      with-cli-and-greeter = caelestia-shell.override {
+        withCli = true;
+        withGreeter = true;
+      };
       debug = caelestia-shell.override {debug = true;};
       default = caelestia-shell;
     });

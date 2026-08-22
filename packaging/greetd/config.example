@@ -1,0 +1,8 @@
+# Required: the user whose PAM session greetd should create.
+CAELESTIA_GREETER_USER=your-user
+
+# Optional: the UWSM desktop entry launched after authentication.
+CAELESTIA_GREETER_SESSION_DESKTOP=hyprland.desktop
+
+# Optional: a system-readable wallpaper. The packaged Caelestia wallpaper is the default.
+# CAELESTIA_GREETER_BACKGROUND=/usr/share/backgrounds/my-wallpaper.jpg
