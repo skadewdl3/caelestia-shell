@@ -78,7 +78,7 @@ MouseArea {
                 Quickshell.execDetached(["sh", "-c", "wl-copy --type image/png < " + path]);
                 Quickshell.execDetached(["notify-send", "-a", "caelestia-cli", "-i", path, "Screenshot taken", "Screenshot copied to clipboard"]);
             } else {
-                Quickshell.execDetached(["swappy", "-f", path]);
+                Quickshell.execDetached(["sh", Quickshell.shellPath("assets/swappy-wrapper.sh"), path, Colours.light ? "light" : "dark", Colours.palette.m3surface, Colours.palette.m3surfaceContainer, Colours.palette.m3surfaceContainerHigh, Colours.palette.m3onSurface, Colours.palette.m3onSurfaceVariant, Colours.palette.m3primary, Colours.palette.m3onPrimary, Colours.palette.m3secondaryContainer, Colours.palette.m3onSecondaryContainer, Colours.palette.m3outlineVariant, Colours.palette.m3error]);
             }
             closeAnim.start();
         });
