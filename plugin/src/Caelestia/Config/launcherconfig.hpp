@@ -67,6 +67,12 @@ class LauncherConfig : public settings::ObjectNode {
                 { u"command"_s, QStringList{ u"autocomplete"_s, u"clip"_s } },
             }),
             vmap({
+                { u"name"_s, markCtx(u"Emoji"_s, u"launcher action"_s) },
+                { u"icon"_s, u"emoji_emotions"_s },
+                { u"description"_s, mark(u"Search emojis and glyphs"_s) },
+                { u"command"_s, QStringList{ u"autocomplete"_s, u"emoji"_s } },
+            }),
+            vmap({
                 { u"name"_s, markCtx(u"Scheme"_s, u"launcher action"_s) },
                 { u"icon"_s, u"palette"_s },
                 { u"description"_s, mark(u"Change the current colour scheme"_s) },

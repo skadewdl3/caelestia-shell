@@ -21,6 +21,7 @@ Item {
 
     readonly property bool showWallpapers: search.text.startsWith(`${GlobalConfig.launcher.actionPrefix}wallpaper `)
     readonly property bool showClips: search.text === `${GlobalConfig.launcher.actionPrefix}clip` || search.text.startsWith(`${GlobalConfig.launcher.actionPrefix}clip `)
+    readonly property bool showEmojis: search.text === `${GlobalConfig.launcher.actionPrefix}emoji` || search.text.startsWith(`${GlobalConfig.launcher.actionPrefix}emoji `)
     readonly property var currentList: showWallpapers ? wallpaperList.item : appList.item // Can be either ListView or PathView, so can't type properly
     property string animState: showWallpapers ? "wallpapers" : "apps"
 
@@ -124,7 +125,7 @@ Item {
         anchors.verticalCenter: parent.verticalCenter
 
         MaterialIcon {
-            text: root.state === "wallpapers" ? "wallpaper_slideshow" : (root.showClips ? "content_paste_off" : "manage_search")
+            text: root.state === "wallpapers" ? "wallpaper_slideshow" : (root.showClips ? "content_paste_off" : (root.showEmojis ? "emoji_emotions" : "manage_search"))
             color: Colours.palette.m3onSurfaceVariant
             fontStyle: Tokens.font.icon.extraLarge
 
@@ -135,13 +136,13 @@ Item {
             anchors.verticalCenter: parent.verticalCenter
 
             StyledText {
-                text: root.state === "wallpapers" ? Tr.tr("No wallpapers found") : (root.showClips ? Tr.tr("Clipboard history is empty") : Tr.tr("No results"))
+                text: root.state === "wallpapers" ? Tr.tr("No wallpapers found") : (root.showClips ? Tr.tr("Clipboard history is empty") : (root.showEmojis ? Tr.tr("No emojis found") : Tr.tr("No results")))
                 color: Colours.palette.m3onSurfaceVariant
                 font: Tokens.font.body.builders.large.weight(Font.Medium).build()
             }
 
             StyledText {
-                text: root.state === "wallpapers" && Wallpapers.list.length === 0 ? Tr.tr("Try putting some wallpapers in %1").arg(Paths.shortenHome(Paths.wallsdir)) : (root.showClips ? Tr.tr("Copy some text or an image to get started") : Tr.tr("Try searching for something else"))
+                text: root.state === "wallpapers" && Wallpapers.list.length === 0 ? Tr.tr("Try putting some wallpapers in %1").arg(Paths.shortenHome(Paths.wallsdir)) : (root.showClips ? Tr.tr("Copy some text or an image to get started") : (root.showEmojis ? Tr.tr("Try a different name or keyword") : Tr.tr("Try searching for something else")))
                 color: Colours.palette.m3onSurfaceVariant
                 font: Tokens.font.body.medium
             }

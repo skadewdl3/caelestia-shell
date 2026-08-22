@@ -44,6 +44,8 @@ Item {
                     currentItem.onClicked();
                 else if (list.showClips)
                     Services.Clipboard.activate(currentItem.modelData, list.currentList);
+                else if (list.showEmojis)
+                    Services.Emojis.activate(currentItem.modelData, list.currentList);
                 else
                     currentItem.modelData.onClicked(list.currentList);
             } else {
