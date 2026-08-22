@@ -14,6 +14,9 @@
   libqalculate,
   bash,
   hyprland,
+  cage,
+  greetd,
+  uwsm,
   material-symbols,
   rubik,
   nerd-fonts,
@@ -31,6 +34,7 @@
   m3shapes,
   debug ? false,
   withCli ? false,
+  withGreeter ? false,
   extraRuntimeDeps ? [],
 }: let
   version = "1.0.0";
@@ -51,7 +55,8 @@
       hyprland
     ]
     ++ extraRuntimeDeps
-    ++ lib.optional withCli caelestia-cli;
+    ++ lib.optional withCli caelestia-cli
+    ++ lib.optionals withGreeter [cage greetd uwsm];
 
   fontconfig = makeFontsConf {
     fontDirectories = [material-symbols rubik nerd-fonts.caskaydia-cove];
@@ -141,8 +146,10 @@ in
 
     cmakeFlags =
       [
-        (lib.cmakeFeature "ENABLE_MODULES" "shell")
+        (lib.cmakeFeature "ENABLE_MODULES" (if withGreeter then "shell;greeter" else "shell"))
         (lib.cmakeFeature "INSTALL_QSCONFDIR" "${placeholder "out"}/share/caelestia-shell")
+        (lib.cmakeFeature "INSTALL_GREETER_QSCONFDIR" "${placeholder "out"}/share/caelestia-greeter")
+        (lib.cmakeFeature "INSTALL_GREETER_LIBEXECDIR" "${placeholder "out"}/libexec/caelestia-greeter")
       ]
       ++ cmakeVersionFlags;
 
@@ -162,6 +169,12 @@ in
       	--set CAELESTIA_LIB_DIR ${extras}/lib \
         --set CAELESTIA_XKB_RULES_PATH ${xkeyboard-config}/share/xkeyboard-config-2/rules/base.lst \
       	--add-flags "-p $out/share/caelestia-shell"
+
+      ${lib.optionalString withGreeter ''
+        wrapProgram $out/bin/caelestia-greeter \
+          --prefix PATH : "${lib.makeBinPath runtimeDeps}" \
+          --set FONTCONFIG_FILE "${fontconfig}"
+      ''}
 
       mkdir -p $out/lib
       ln -s ${extras}/lib/* $out/lib/

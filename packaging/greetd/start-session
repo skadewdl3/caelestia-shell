@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+if [[ -c /dev/tty ]]; then
+    printf '\033[40m\033[2J\033[3J\033[H\033[?25l' > /dev/tty 2>/dev/null || true
+fi
+
+desktop="${CAELESTIA_GREETER_SESSION_DESKTOP:-hyprland.desktop}"
+exec uwsm start -e -D Hyprland "$desktop" </dev/null >/dev/null 2>&1

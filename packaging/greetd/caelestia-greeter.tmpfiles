@@ -1,0 +1,3 @@
+d /run/caelestia-greeter 0700 greeter greeter -
+d /var/lib/caelestia-greeter 0750 greeter greeter -
+d /var/cache/caelestia-greeter 0750 greeter greeter -
