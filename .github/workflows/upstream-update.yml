@@ -1,0 +1,131 @@
+name: Check for upstream release
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 2 * * *"
+
+concurrency:
+  group: upstream-release-update
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Configure Git
+        run: |
+          git config user.name "caelestia-upstream-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config rerere.enabled true
+          git config rerere.autoupdate true
+
+      - name: Check latest stable release
+        id: check
+        run: scripts/update-upstream --check --ci
+
+      - name: Check for an existing update branch
+        if: steps.check.outputs.updated == 'true'
+        id: existing
+        env:
+          UPDATE_BRANCH: ${{ steps.check.outputs.update_branch }}
+        run: |
+          if git ls-remote --exit-code --heads origin "refs/heads/$UPDATE_BRANCH" >/dev/null; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "found=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Rebase custom patches
+        if: steps.check.outputs.updated == 'true' && steps.existing.outputs.found == 'false'
+        id: rebase
+        continue-on-error: true
+        env:
+          TARGET_TAG: ${{ steps.check.outputs.target_tag }}
+        run: scripts/update-upstream --ci "$TARGET_TAG"
+
+      - name: Validate an existing update branch
+        if: steps.existing.outputs.found == 'true'
+        env:
+          TARGET_TAG: ${{ steps.check.outputs.target_tag }}
+          UPDATE_BRANCH: ${{ steps.check.outputs.update_branch }}
+        run: |
+          git fetch --quiet origin "+refs/heads/$UPDATE_BRANCH:refs/remotes/origin/$UPDATE_BRANCH"
+          git merge-base --is-ancestor "$TARGET_TAG^{commit}" "origin/$UPDATE_BRANCH"
+
+      - name: Push update branch
+        if: steps.rebase.outcome == 'success'
+        env:
+          UPDATE_BRANCH: ${{ steps.check.outputs.update_branch }}
+        run: git push origin "HEAD:refs/heads/$UPDATE_BRANCH"
+
+      - name: Close superseded update PRs
+        if: steps.check.outputs.updated == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          UPDATE_BRANCH: ${{ steps.check.outputs.update_branch }}
+        run: |
+          gh pr list --base main --state open --json number,headRefName \
+            --jq '.[] | select(.headRefName | startswith("update/")) | [.number, .headRefName] | @tsv' |
+          while IFS=$'\t' read -r number branch; do
+            if [[ -n "$number" && "$branch" != "$UPDATE_BRANCH" ]]; then
+              gh pr close "$number" --comment "Superseded by $UPDATE_BRANCH."
+            fi
+          done
+
+      - name: Open update PR
+        if: steps.check.outputs.updated == 'true' && (steps.existing.outputs.found == 'true' || steps.rebase.outcome == 'success')
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CURRENT_TAG: ${{ steps.check.outputs.current_tag }}
+          TARGET_TAG: ${{ steps.check.outputs.target_tag }}
+          UPDATE_BRANCH: ${{ steps.check.outputs.update_branch }}
+        run: |
+          existing_pr=$(gh pr list --base main --head "$UPDATE_BRANCH" --state open --json number --jq '.[0].number // empty')
+          if [[ -n "$existing_pr" ]]; then
+            exit 0
+          fi
+
+          body=$(printf '%s\n\n%s\n\n%s\n%s\n' \
+            "Rebases the maintained patch stack from $CURRENT_TAG onto upstream $TARGET_TAG." \
+            "Review the checks and the two-tree diff locally with: git diff origin/main..$UPDATE_BRANCH" \
+            "Do **not** use GitHub's merge, squash, or rebase buttons for this PR." \
+            "After checks pass, run the **Promote upstream update** workflow with this PR number.")
+          gh pr create \
+            --base main \
+            --head "$UPDATE_BRANCH" \
+            --title "chore: rebase custom patches onto $TARGET_TAG" \
+            --body "$body"
+
+      - name: Report a conflicting update
+        if: steps.rebase.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CURRENT_TAG: ${{ steps.check.outputs.current_tag }}
+          TARGET_TAG: ${{ steps.check.outputs.target_tag }}
+          CONFLICT_FILES: ${{ steps.rebase.outputs.conflict_files }}
+        run: |
+          title="Upstream update to $TARGET_TAG needs manual rebase"
+          issue=$(gh issue list --state open --search "$title in:title" --json number,title \
+            --jq ".[] | select(.title == \"$title\") | .number" | head -n1)
+          body=$(printf '%s\n\n%s\n\n```text\n%s\n```\n\n%s\n' \
+            "The automatic rebase from $CURRENT_TAG onto $TARGET_TAG conflicted." \
+            "Conflicting paths:" "$CONFLICT_FILES" \
+            "Run scripts/update-upstream $TARGET_TAG locally, resolve the rebase, push update/$TARGET_TAG, and rerun this workflow to open the review PR.")
+          if [[ -n "$issue" ]]; then
+            gh issue edit "$issue" --body "$body"
+          else
+            gh issue create --title "$title" --body "$body"
+          fi
+          exit 1
