@@ -1,984 +1,169 @@
-<h1 align=center>caelestia-shell</h1>
+<h1 align="center">Caelestia Shell — patched fork</h1>
 
-<div align=center>
+<div align="center">
 
-![GitHub last commit](https://img.shields.io/github/last-commit/caelestia-dots/shell?style=for-the-badge&labelColor=101418&color=9ccbfb)
-![GitHub Repo stars](https://img.shields.io/github/stars/caelestia-dots/shell?style=for-the-badge&labelColor=101418&color=b9c8da)
-![GitHub repo size](https://img.shields.io/github/repo-size/caelestia-dots/shell?style=for-the-badge&labelColor=101418&color=d3bfe6)
-[![Ko-Fi donate](https://img.shields.io/badge/donate-kofi?style=for-the-badge&logo=ko-fi&logoColor=ffffff&label=ko-fi&labelColor=101418&color=f16061&link=https%3A%2F%2Fko-fi.com%2Fsoramane)](https://ko-fi.com/soramane)
-[![Discord invite](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fdiscordapp.com%2Fapi%2Finvites%2FBGDCFCmMBk%3Fwith_counts%3Dtrue&query=approximate_member_count&style=for-the-badge&logo=discord&logoColor=ffffff&label=discord&labelColor=101418&color=96f1f1&link=https%3A%2F%2Fdiscord.gg%2FBGDCFCmMBk)][discord]
+[Upstream shell](https://github.com/caelestia-dots/shell) · [Caelestia dots](https://github.com/caelestia-dots/caelestia) · [Fork releases](https://github.com/skadewdl3/caelestia-shell/releases)
 
 </div>
 
-https://github.com/user-attachments/assets/0840f496-575c-4ca6-83a8-87bb01a85c5f
+This is an unofficial fork of [Caelestia Shell](https://github.com/caelestia-dots/shell) with a small set of extra tools and behaviour changes layered on top. Install the official Caelestia dots first, then use the scripts in this repository to switch only the shell to this checkout. That leaves the official installation available as a known-good backup and keeps the CLI, Hyprland integration, themes, configuration tools, and other Caelestia goodies in place.
 
-## Components
+For standard installation, configuration, shortcuts, IPC, wallpaper, and troubleshooting documentation, use the [upstream Caelestia Shell README](https://github.com/caelestia-dots/shell#readme). This README only covers what this fork changes.
 
--   Widgets: [`Quickshell`](https://quickshell.outfoxxed.me)
--   Window manager: [`Hyprland`](https://hypr.land)
--   Dots: [`caelestia`][dots-repo]
+## What's added
 
-## Installation
+- **Clipboard manager** — search text and image history from the launcher with `>clip`, see image previews, pin frequently used entries with <kbd>Ctrl</kbd>+<kbd>P</kbd>, and remove entries with <kbd>Shift</kbd>+<kbd>Delete</kbd>. Selecting an entry copies it back to the clipboard.
+- **Emoji picker** — search emoji and glyph descriptions with `>emoji`. Selecting a result copies it and frequently used entries are promoted automatically.
+- **Dedicated shortcuts** — the `clipboard` and `emoji` Caelestia global shortcuts open their respective launcher modes directly.
+- **Integrated screenshot editor** — screenshots open in a themed Swappy editing interface instead of dropping directly into an external window.
+- **greetd greeter** — an optional, isolated Caelestia login screen with Cage and UWSM integration.
+- **Safer themed icons** — launcher icons are loaded synchronously to avoid unreliable themed application icons.
+- **Simpler recording access** — the recording card opens the recordings directory directly.
+- **Upstream release rebases** — the fork is automatically rebased onto new upstream releases; see [MAINTAINING.md](MAINTAINING.md) for the maintainer workflow.
 
-> [!NOTE]
-> This repo is for Caelestia's desktop shell only. If you want installation instructions
-> for the entire dotfiles (which include this shell), head to [the main repo][dots-repo] instead.
+The launcher prefix defaults to `>`. If you changed `launcher.actionPrefix`, use that value instead.
 
-### Arch Linux
+The full dots do not bind the fork's new shortcuts automatically. Add bindings like these to your Hyprland configuration if you want direct access:
 
-> [!WARNING]
-> If you want to make your own changes/tweaks to the shell, do NOT edit the files installed by the AUR
-> package. Instead, follow the instructions in the [manual installation section](#manual-installation).
+```ini
+bind = SUPER, V, global, caelestia:clipboard
+bind = SUPER, period, global, caelestia:emoji
+```
 
-The shell is available from the AUR as `caelestia-shell`. You can install it with an AUR helper (recommended),
-like [`paru`](https://github.com/morganamilo/paru), or by manually downloading the PKGBUILD and running `makepkg -si`.
+## Install the official Caelestia setup first
 
-A package following the latest commit also exists as `caelestia-shell-git`. This is bleeding-edge
-and likely to be unstable/have bugs. Regular users are recommended to use the stable package (`caelestia-shell`).
-
-### Nix
-
-You can run the shell directly via `nix run`:
+Follow the [official Caelestia installation instructions](https://github.com/caelestia-dots/caelestia#installation) and make sure the stock shell starts successfully before switching to this fork. In particular, these commands must work:
 
 ```sh
-nix run github:caelestia-dots/shell#with-cli
+caelestia shell -d
+qs --version
 ```
 
-Or add it to your system configuration:
+Starting from a working official installation is intentional: `switch.sh` reuses its Caelestia CLI and runtime integration, saves its shell configuration, and gives `unswitch.sh` something known-good to restore if this fork breaks.
 
-```nix
-{
-  inputs = {
-    nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
+## Switch to this fork
 
-    caelestia-shell = {
-      url = "github:caelestia-dots/shell";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
-  };
-}
+Install the local build tools and fork-specific runtime dependencies first:
+
+- `git`
+- `cmake`
+- `ninja`
+- `cliphist`
+- `wl-clipboard`
+- `swappy`
+
+On Arch Linux, they can be installed with:
+
+```sh
+sudo pacman -S --needed git cmake ninja cliphist wl-clipboard swappy
 ```
 
-For full functionality, use `caelestia-shell.packages.<system>.with-cli`, which can be added to your
-`environment.systemPackages`, `users.users.<username>.packages`, `home.packages` if using home-manager,
-or a devshell. The `default` package does not include the CLI.
-You can then run the shell with `caelestia-shell`.
+Clone this repository somewhere outside `~/.config/quickshell/caelestia`. The following location keeps source checkouts separate from active configuration:
 
-For home-manager, you can also use Caelestia's Home Manager module (explained in [the configuration section](#home-manager-module)), which installs and configures the shell and CLI.
-
-### Manual installation
-
-Dependencies:
-
--   [`caelestia-cli`](https://github.com/caelestia-dots/cli)
--   [`quickshell-git`](https://git.outfoxxed.me/quickshell/quickshell) - this has to be the git version, not the latest tagged version
--   `glibc`
--   `gcc-libs`
--   [`ddcutil`](https://github.com/rockowitz/ddcutil)
--   [`brightnessctl`](https://github.com/Hummer12007/brightnessctl)
--   [`libcava`](https://github.com/LukashonakV/cava)
--   [`networkmanager`](https://gitlab.freedesktop.org/NetworkManager/NetworkManager)
--   [`lm_sensors`](https://github.com/lm-sensors/lm-sensors)
--   [`aubio`](https://github.com/aubio/aubio)
--   [`libpipewire`](https://github.com/PipeWire/pipewire)
--   [`libqalculate`](https://github.com/Qalculate/libqalculate)
--   [`power-profiles-daemon`](https://gitlab.freedesktop.org/upower/power-profiles-daemon)
--   [`ttf-material-symbols-variable`](https://github.com/google/material-design-icons)
--   [`ttf-rubik-vf`](https://github.com/googlefonts/rubik)
--   [`ttf-cascadia-code-nerd`](https://github.com/ryanoasis/nerd-fonts)
--   `qt6-base`
--   `qt6-declarative`
--   `qt6-imageformats`
--   [`qt6-m3shapes-git`](https://github.com/soramanew/m3shapes)
--   [`swappy`](https://github.com/jtheoof/swappy)
--   [`cliphist`](https://github.com/sentriz/cliphist)
--   [`wl-clipboard`](https://github.com/bugaevc/wl-clipboard)
--   [`fish`](https://github.com/fish-shell/fish-shell)
--   [`bash`](https://www.gnu.org/software/bash)
-
-Build dependencies:
-
--   [`cmake`](https://gitlab.kitware.com/cmake/cmake)
--   [`ninja`](https://github.com/ninja-build/ninja)
--   `qt6-shadertools`
+```sh
+mkdir -p ~/.local/src
+git clone https://github.com/skadewdl3/caelestia-shell.git ~/.local/src/caelestia-shell
+cd ~/.local/src/caelestia-shell
+./switch.sh
+```
 
 > [!IMPORTANT]
-> The commands below (and in the "Updating" section) assume `$XDG_CONFIG_HOME` is set.
-> If it is unset, substitute it with the path to your config folder (typically `~/.config`).
+> Do not clone the fork directly over `~/.config/quickshell/caelestia`. That path is managed by the switch scripts so the official configuration can be backed up and restored safely.
 
-To install the shell manually, install all dependencies and clone this repo to `$XDG_CONFIG_HOME/quickshell/caelestia`.
-Then build and install using CMake.
+`switch.sh`:
+
+1. builds the fork's native plugin under `build/local`;
+2. saves the current Caelestia Quickshell configuration under `${XDG_STATE_HOME:-$HOME/.local/state}/caelestia-shell-switch`;
+3. links this checkout at `${XDG_CONFIG_HOME:-$HOME/.config}/quickshell/caelestia`;
+4. installs a user-local `caelestia` wrapper in `${XDG_BIN_HOME:-$HOME/.local/bin}` while preserving any existing file there; and
+5. restarts the shell using the fork.
+
+The script refuses to overwrite an existing backup or a launcher it does not own. It does not uninstall or modify the system Caelestia package.
+
+Make sure `~/.local/bin` appears before `/usr/bin` in `PATH` so future `caelestia` commands and login autostarts use the wrapper:
 
 ```sh
-cd $XDG_CONFIG_HOME/quickshell
-git clone https://github.com/caelestia-dots/shell.git caelestia
-
-cd caelestia
-cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/
-cmake --build build
-sudo cmake --install build
+command -v caelestia
 ```
 
-> [!TIP]
-> You can customise the installation location via the CMake flags `INSTALL_LIBDIR`, `INSTALL_QMLDIR`, and
-> `INSTALL_QSCONFDIR` for the libraries (e.g. the version helper), QML plugin, and Quickshell config directories
-> respectively. If you set the `INSTALL_LIBDIR` flag, the `CAELESTIA_LIB_DIR` variable must also be set to
-> the same directory in your system's environment.
->
-> For example, installing to `~/.config/quickshell/caelestia` for easy local changes:
->
-> ```sh
-> mkdir -p ~/.config/quickshell/caelestia
-> cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/ -DINSTALL_QSCONFDIR="$HOME/.config/quickshell/caelestia"
-> cmake --build build
-> sudo cmake --install build
-> sudo chown -R $USER ~/.config/quickshell/caelestia
-> ```
+After switching, this should normally print `$HOME/.local/bin/caelestia`.
 
-## Usage
+## Update the fork
 
-You can start the shell by running `caelestia shell -d` (preferred) or `qs -c caelestia -n -d`.
-You may omit `-d` from the command to keep the shell attached to the current terminal if necessary,
-though you likely want it to be detached (so it doesn't close when the terminal is closed).
-
-If using the [Caelestia dotfiles][dots-repo], the shell will be autostarted on login
-via a `hl.on("hyprland.start", ...)` function in the Hyprland config.
-
-### Shortcuts/IPC
-
-All keybinds are accessible via Hyprland [global shortcuts](https://wiki.hypr.land/Configuring/Basics/Binds/#dbus-global-shortcuts).
-If using the [Caelestia dotfiles][dots-repo], the keybinds are already configured for you.
-Otherwise, the [`keybinds.lua`](https://github.com/caelestia-dots/caelestia/blob/main/hypr/hyprland/keybinds.lua#L63-L67) file
-contains an example of how to use global shortcuts.
-
-### greetd greeter
-
-This fork also ships a separate Caelestia greeter for `greetd`. It is a dedicated
-Quickshell entry point and does not start the authenticated desktop shell or load
-user-session services before login.
-
-The default CMake build installs the greeter. On Nix, use the `with-greeter` or
-`with-cli-and-greeter` package output. You also need `greetd`, Cage, UWSM, and a
-Quickshell build with `Quickshell.Services.Greetd`.
-
-After installing the package:
-
-1. Copy `config.example` from the installed Caelestia greeter data directory to
-   `/etc/caelestia-greeter/config` and set `CAELESTIA_GREETER_USER`.
-2. Review `greetd-config.toml` from the same directory and merge the relevant
-   values into `/etc/greetd/config.toml`. Do not overwrite an existing display
-   manager configuration without reviewing it.
-3. Create the isolated runtime directories with
-   `systemd-tmpfiles --create caelestia-greeter.conf`.
-4. Enable `greetd.service` only after confirming that you have a working recovery
-   path from another VT.
-
-The greeter defaults to the packaged wallpaper. Set
-`CAELESTIA_GREETER_BACKGROUND` in the system config to use another
-system-readable image. It launches `hyprland.desktop` through UWSM by default;
-`CAELESTIA_GREETER_SESSION_DESKTOP` can select a different installed desktop
-entry.
-
-For a safe desktop preview from a source checkout:
+Upstream release updates rewrite the fork's patch-stack history, so a normal `git pull` may eventually report that `main` has diverged. Fetch the latest tested revision directly and rerun the switch script:
 
 ```sh
+cd ~/.local/src/caelestia-shell
+git fetch origin
+git switch --detach origin/main
+./switch.sh
+```
+
+Detached mode is intentional here: it follows the current fork without resetting or deleting your local branches. Git will refuse to switch if doing so would overwrite uncommitted changes. Because upstream updates are rebased into this fork, put personal work on a separate branch if you want to carry additional patches.
+
+## Restore the official shell
+
+Run the rollback script from the same checkout:
+
+```sh
+cd ~/.local/src/caelestia-shell
+./unswitch.sh
+```
+
+This stops the fork, restores the saved official Quickshell configuration and user-local launcher, and starts the system Caelestia shell again. The downloaded repository and local build cache remain in place, so switching back later is quick.
+
+`unswitch.sh` also refuses to replace the active configuration or launcher if they no longer match the files created by `switch.sh`. Resolve those changes manually instead of deleting the saved state directory.
+
+## Optional greetd greeter
+
+This fork also ships a separate Caelestia greeter for [`greetd`](https://sr.ht/~kennylevinsen/greetd/). It is a dedicated Quickshell entry point and does not start the authenticated desktop shell or load user-session services before login.
+
+> [!IMPORTANT]
+> `switch.sh` does not install or configure the greeter. A display manager is system-level configuration: keep access to another VT and a working recovery path while setting it up.
+
+The default CMake build includes the greeter. On Nix, use the `with-greeter` or `with-cli-and-greeter` package output. In addition to the normal Caelestia dependencies, the greeter needs:
+
+- `greetd`;
+- [Cage](https://github.com/cage-kiosk/cage);
+- [UWSM](https://github.com/Vladimir-csp/uwsm); and
+- a Quickshell build with `Quickshell.Services.Greetd`.
+
+To build and install only the greeter from this checkout with CMake:
+
+```sh
+cmake -S . -B build/greeter -G Ninja \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DCMAKE_INSTALL_PREFIX=/usr \
+  -DENABLE_MODULES=greeter
+cmake --build build/greeter
+sudo cmake --install build/greeter
+```
+
+After installing it:
+
+1. Copy `/usr/share/caelestia-greeter/config.example` to `/etc/caelestia-greeter/config` and set `CAELESTIA_GREETER_USER` to the account that greetd should authenticate.
+2. Review `/usr/share/caelestia-greeter/greetd-config.toml` and merge the relevant values into `/etc/greetd/config.toml`. Do not overwrite an existing display-manager configuration without reviewing it.
+3. Create the isolated runtime directories:
+
+   ```sh
+   sudo systemd-tmpfiles --create caelestia-greeter.conf
+   ```
+
+4. Confirm that another VT is usable, then enable `greetd.service` according to your distribution's instructions.
+
+The greeter uses the packaged wallpaper by default. Set `CAELESTIA_GREETER_BACKGROUND` in `/etc/caelestia-greeter/config` to a different system-readable image. It starts `hyprland.desktop` through UWSM by default; set `CAELESTIA_GREETER_SESSION_DESKTOP` to select another installed desktop entry.
+
+Preview the greeter safely from the source checkout before changing the display manager:
+
+```sh
+cd ~/.local/src/caelestia-shell
 CAELESTIA_GREETER_USER="$USER" qs -p ./greeter.qml
 ```
 
-All IPC commands can be accessed via `caelestia shell ...`, for example:
+## Support and credits
 
-```sh
-caelestia shell mpris getActive trackTitle
-```
+Caelestia Shell is created and maintained by the [Caelestia project](https://github.com/caelestia-dots). Please support the upstream project and use its documentation for standard shell behaviour.
 
-You can view the list of available IPC commands by running `caelestia shell -s`.
+Report problems caused by the clipboard manager, emoji picker, greeter, screenshot editor, switch scripts, or other fork patches in [this fork's issue tracker](https://github.com/skadewdl3/caelestia-shell/issues). Reproduce an issue with the official shell before reporting it upstream.
 
-### PFP/Wallpapers
-
-The profile picture for the dashboard is read from the file `~/.face`. You can set it by clicking it in the dashboard,
-or by manually copying or symlinking your image to the path.
-
-The wallpapers for the wallpaper switcher are read from `~/Pictures/Wallpapers`
-by default. To change it, modify `paths.wallpaperDir` in `~/.config/caelestia/shell.json`.
-
-To set the wallpaper, you can type `>wallpaper` in the launcher to open the wallpaper switcher.
-Alternatively, you can also use `caelestia wallpaper -f <path_to_wallpaper>` to set the wallpaper directly.
-Use `caelestia wallpaper -h` for more info about this command.
-
-## Updating
-
-### Packaged install (AUR)
-
-If using the full dotfiles or the CLI, run `caelestia update` to perform a full system update and
-update the dots.
-Otherwise, if you installed the shell on its own, update your system using your AUR helper (e.g., `paru`).
-
-### Manual install
-
-If you installed the shell manually by cloning the repo, you can update by pulling the changes from git
-in the local checkout.
-
-For example, if you installed to `$XDG_CONFIG_HOME/quickshell/caelestia`:
-
-```sh
-cd $XDG_CONFIG_HOME/quickshell/caelestia
-git pull
-```
-
-## Configuring
-
-All configuration options belong in `~/.config/caelestia/shell.json`. This file is _not_ created by
-default; you must create it manually. Options that you omit from the config file will use their default
-values.
-
-### Per-monitor configuration
-
-You can configure per-monitor options in `~/.config/caelestia/monitors/<monitor_name>/shell.json`.
-List the names of your available monitors by running:
-
-```sh
-hyprctl monitors -j | jq -r '.[].name'
-```
-
-Options set in these files will **override** the respective options in the global config. Any options not present in
-per-monitor configs will inherit their values from the global config.
-
-
-For example, to automatically hide the bar on the monitor named `DP-1`:
-
-**`~/.config/caelestia/monitors/DP-1/shell.json`**
-
-```json
-{
-    "bar": {
-        "persistent": false
-    }
-}
-```
-
-> [!NOTE]
-> Not all options respect per-monitor overrides. Most notably, the following options will only read
-> from the global config, and ignore the respective option in per-monitor config files.
->
-> <details><summary>Ignored options</summary>
->
-> - `appearance`: `anim.*`, `transparency.*`
-> - `bar.tray`: `hiddenIcons`, `iconSubs`
-> - `bar.workspaces`: `ignoredTags`, `perMonitorWorkspaces`, `specialWorkspaceIcons`, `windowIcons`
-> - `dashboard`: `mediaUpdateInterval`, `resourceUpdateInterval`
-> - `general`: `apps.*`, `battery.*`, `idle.*`, `logo`
-> - `launcher`: `actionPrefix`, `actions`, `enableDangerousActions`, `favouriteApps`, `hiddenApps`, `specialPrefix`, `useFuzzy.*`, `vimKeybinds`
-> - `lock`: `enableFprint`, `enableHowdy`, `maxFprintTries`, `maxHowdyTries`, `triggerHowdyOnWake`
-> - `nexus`: `networkRescanInterval`
-> - `notifs`: `actionOnClick`, `defaultExpireTimeout`, `expire`, `fullscreen`, `fullscreenExpireTimeout`
-> - `paths`: `lyricsDir`, `wallpaperDir`
-> - `services`: `audioIncrement`, `brightnessIncrement`, `defaultPlayer`, `gpuType`, `lyricsBackend`, `maxVolume`, `playerAliases`, `smartScheme`, `useFahrenheit`, `useFahrenheitPerformance`, `useTwelveHourClock`, `visualiserBars`, `weatherLocation`
-> - `utilities.toasts`: all except `fullscreen`
-> - `utilities.vpn`: `enabled`, `provider`, `selectedProvider`
->
-> </details>
-
-### Example configuration
-
-> [!WARNING]
-> The example configuration includes **ALL** configuration options in `shell.json`. It is
-> **not** recommended to copy and paste this entire configuration into `shell.json`,
-> as options or their default values may change across updates, resulting in a stale config.
->
-> This is meant to serve as a reference of all the available options, and you should
-> <ins>only add the ones you want to change</ins> to `shell.json`.
-
-<details><summary>Example config</summary>
-
-```json
-{
-    "enabled": true,
-    "appearance": {
-        "deformScale": 1,
-        "rounding": {
-            "scale": 1
-        },
-        "spacing": {
-            "scale": 1
-        },
-        "padding": {
-            "scale": 1
-        },
-        "font": {
-            "scale": 1,
-            "clock": "Rubik",
-            "workspaces": "Rubik",
-            "headline": {
-                "family": "GoogleSansFlex",
-                "large": { "size": 32, "weight": 500, "italic": false, "vaxes": { "ROND": 25 } },
-                "medium": { "size": 28, "weight": 500, "italic": false, "vaxes": { "ROND": 25 } },
-                "small": { "size": 24, "weight": 500, "italic": false, "vaxes": { "ROND": 25 } }
-            },
-            "title": {
-                "family": "GoogleSansFlex",
-                "large": { "size": 22, "weight": 500, "italic": false, "vaxes": { "ROND": 25 } },
-                "medium": { "size": 16, "weight": 500, "italic": false, "vaxes": { "ROND": 25 } },
-                "small": { "size": 14, "weight": 500, "italic": false, "vaxes": { "ROND": 25 } }
-            },
-            "body": {
-                "family": "GoogleSansFlex",
-                "large": { "size": 16, "weight": 400, "italic": false, "vaxes": { "ROND": 25 } },
-                "medium": { "size": 14, "weight": 400, "italic": false, "vaxes": { "ROND": 25 } },
-                "small": { "size": 12, "weight": 400, "italic": false, "vaxes": { "ROND": 25 } }
-            },
-            "label": {
-                "family": "GoogleSansFlex",
-                "large": { "size": 14, "weight": 500, "italic": false, "vaxes": { "ROND": 25 } },
-                "medium": { "size": 12, "weight": 500, "italic": false, "vaxes": { "ROND": 25 } },
-                "small": { "size": 11, "weight": 400, "italic": false, "vaxes": { "ROND": 25 } }
-            },
-            "mono": {
-                "family": "CaskaydiaCove NF",
-                "large": { "size": 16, "weight": 400, "italic": false, "vaxes": {} },
-                "medium": { "size": 14, "weight": 400, "italic": false, "vaxes": {} },
-                "small": { "size": 12, "weight": 400, "italic": false, "vaxes": {} }
-            },
-            "icon": {
-                "family": "Material Symbols Rounded",
-                "extraLarge": { "size": 36, "weight": 400, "italic": false, "vaxes": {} },
-                "large": { "size": 24, "weight": 400, "italic": false, "vaxes": {} },
-                "medium": { "size": 18, "weight": 400, "italic": false, "vaxes": {} },
-                "small": { "size": 15, "weight": 400, "italic": false, "vaxes": {} }
-            }
-        },
-        "anim": {
-            "durations": {
-                "scale": 1
-            }
-        },
-        "transparency": {
-            "enabled": false,
-            "base": 0.85,
-            "layers": 0.4
-        }
-    },
-    "general": {
-        "logo": "",
-        "showOverFullscreen": false,
-        "mediaGifSpeedAdjustment": 300,
-        "sessionGifSpeed": 0.7,
-        "apps": {
-            "terminal": ["foot"],
-            "audio": ["pwvucontrol"],
-            "playback": ["mpv"],
-            "explorer": ["thunar"]
-        },
-        "idle": {
-            "lockBeforeSleep": true,
-            "inhibitWhenAudio": true,
-            "inhibitWhenCharging": false,
-            "timeouts": [
-                {
-                    "timeout": 180,
-                    "idleAction": "lock",
-                    "inhibitWhenAudio": false,
-                    "inhibitWhenCharging": false,
-                    "respectInhibitors": true
-                },
-                {
-                    "timeout": 300,
-                    "idleAction": "dpms off",
-                    "returnAction": "dpms on"
-                },
-                {
-                    "timeout": 600,
-                    "idleAction": ["suspendThenHibernate"]
-                }
-            ]
-        },
-        "battery": {
-            "warnLevels": [
-                {
-                    "level": 20,
-                    "title": "Low battery",
-                    "message": "You might want to plug in a charger",
-                    "icon": "battery_android_frame_2"
-                },
-                {
-                    "level": 10,
-                    "title": "Did you see the previous message?",
-                    "message": "You should probably plug in a charger <b>now</b>",
-                    "icon": "battery_android_frame_1"
-                },
-                {
-                    "level": 5,
-                    "title": "Critical battery level",
-                    "message": "PLUG THE CHARGER RIGHT NOW!!",
-                    "icon": "battery_android_alert",
-                    "critical": true
-                }
-            ],
-            "criticalLevel": 3
-        }
-    },
-    "background": {
-        "enabled": true,
-        "wallpaperEnabled": true,
-        "desktopClock": {
-            "enabled": false,
-            "scale": 1.0,
-            "position": "bottom-right",
-            "invertColors": false,
-            "background": {
-                "enabled": false,
-                "opacity": 0.7,
-                "blur": true
-            },
-            "shadow": {
-                "enabled": true,
-                "opacity": 0.7,
-                "blur": 0.4
-            }
-        },
-        "visualiser": {
-            "enabled": false,
-            "autoHide": true,
-            "blur": false,
-            "rounding": 1,
-            "spacing": 1
-        }
-    },
-    "bar": {
-        "persistent": true,
-        "showOnHover": true,
-        "dragThreshold": 20,
-        "scrollActions": {
-            "workspaces": true,
-            "volume": true,
-            "brightness": true
-        },
-        "popouts": {
-            "activeWindow": true,
-            "tray": true,
-            "statusIcons": true
-        },
-        "workspaces": {
-            "shown": 5,
-            "activeIndicator": true,
-            "occupiedBg": false,
-            "showWindows": true,
-            "showWindowsOnSpecialWorkspaces": true,
-            "maxWindowIcons": 5,
-            "activeTrail": false,
-            "perMonitorWorkspaces": true,
-            "displayType": "shapes",
-            "label": "  ",
-            "occupiedLabel": "󰮯",
-            "activeLabel": "󰮯",
-            "capitalisation": "preserve",
-            "specialWorkspaceIcons": [
-                {
-                    "name": "steam",
-                    "icon": "sports_esports"
-                }
-            ],
-            "ignoredTags": [
-                "hide_in_bar",
-                "xwl_popup"
-            ],
-            "windowIcons": [
-                {
-                    "regex": "steam(_app_(default|[0-9]+))?",
-                    "icon": "sports_esports"
-                }
-            ]
-        },
-        "activeWindow": {
-            "compact": false,
-            "inverted": false,
-            "showOnHover": true
-        },
-        "tray": {
-            "background": false,
-            "recolour": false,
-            "compact": false,
-            "iconSubs": [],
-            "hiddenIcons": []
-        },
-        "clock": {
-            "background": false,
-            "showDate": false,
-            "showIcon": true
-        },
-        "statusIcons": [
-            {
-                "id": "lockStatus",
-                "enabled": true
-            },
-            {
-                "id": "audio",
-                "enabled": false
-            },
-            {
-                "id": "microphone",
-                "enabled": false
-            },
-            {
-                "id": "kbLayout",
-                "enabled": false
-            },
-            {
-                "id": "network",
-                "enabled": true
-            },
-            {
-                "id": "bluetooth",
-                "enabled": true
-            },
-            {
-                "id": "battery",
-                "enabled": true
-            }
-        ],
-        "entries": [
-            {
-                "id": "logo",
-                "enabled": true
-            },
-            {
-                "id": "workspaces",
-                "enabled": true
-            },
-            {
-                "id": "spacer",
-                "enabled": true
-            },
-            {
-                "id": "activeWindow",
-                "enabled": true
-            },
-            {
-                "id": "spacer",
-                "enabled": true
-            },
-            {
-                "id": "tray",
-                "enabled": true
-            },
-            {
-                "id": "clock",
-                "enabled": true
-            },
-            {
-                "id": "statusIcons",
-                "enabled": true
-            },
-            {
-                "id": "power",
-                "enabled": true
-            }
-        ],
-        "excludedScreens": []
-    },
-    "border": {
-        "thickness": 10,
-        "rounding": 25,
-        "smoothing": 20
-    },
-    "dashboard": {
-        "enabled": true,
-        "showOnHover": true,
-        "showDashboard": true,
-        "showMedia": true,
-        "showPerformance": true,
-        "showWeather": true,
-        "mediaUpdateInterval": 500,
-        "resourceUpdateInterval": 1000,
-        "dragThreshold": 50,
-        "performance": {
-            "showBattery": true,
-            "showGpu": true,
-            "showCpu": true,
-            "showMemory": true,
-            "showStorage": true,
-            "showNetwork": true
-        }
-    },
-    "launcher": {
-        "enabled": true,
-        "showOnHover": false,
-        "maxShown": 7,
-        "maxWallpapers": 9,
-        "specialPrefix": "@",
-        "actionPrefix": ">",
-        "enableDangerousActions": false,
-        "dragThreshold": 50,
-        "vimKeybinds": false,
-        "favouriteApps": [],
-        "hiddenApps": [],
-        "useFuzzy": {
-            "apps": false,
-            "actions": false,
-            "schemes": false,
-            "variants": false,
-            "wallpapers": false
-        },
-        "actions": [
-            {
-                "name": "Calculator",
-                "icon": "calculate",
-                "description": "Do simple math equations (powered by Qalc)",
-                "command": ["autocomplete", "calc"],
-                "enabled": true,
-                "dangerous": false
-            },
-            {
-                "name": "Scheme",
-                "icon": "palette",
-                "description": "Change the current colour scheme",
-                "command": ["autocomplete", "scheme"],
-                "enabled": true,
-                "dangerous": false
-            },
-            {
-                "name": "Wallpaper",
-                "icon": "image",
-                "description": "Change the current wallpaper",
-                "command": ["autocomplete", "wallpaper"],
-                "enabled": true,
-                "dangerous": false
-            },
-            {
-                "name": "Variant",
-                "icon": "colors",
-                "description": "Change the current scheme variant",
-                "command": ["autocomplete", "variant"],
-                "enabled": true,
-                "dangerous": false
-            },
-            {
-                "name": "Random",
-                "icon": "casino",
-                "description": "Switch to a random wallpaper",
-                "command": ["caelestia", "wallpaper", "-r"],
-                "enabled": true,
-                "dangerous": false
-            },
-            {
-                "name": "Light",
-                "icon": "light_mode",
-                "description": "Change the scheme to light mode",
-                "command": ["setMode", "light"],
-                "enabled": true,
-                "dangerous": false
-            },
-            {
-                "name": "Dark",
-                "icon": "dark_mode",
-                "description": "Change the scheme to dark mode",
-                "command": ["setMode", "dark"],
-                "enabled": true,
-                "dangerous": false
-            },
-            {
-                "name": "Shutdown",
-                "icon": "power_settings_new",
-                "description": "Shutdown the system",
-                "command": ["poweroff"],
-                "enabled": true,
-                "dangerous": true
-            },
-            {
-                "name": "Reboot",
-                "icon": "cached",
-                "description": "Reboot the system",
-                "command": ["reboot"],
-                "enabled": true,
-                "dangerous": true
-            },
-            {
-                "name": "Logout",
-                "icon": "exit_to_app",
-                "description": "Log out of the current session",
-                "command": ["logout"],
-                "enabled": true,
-                "dangerous": true
-            },
-            {
-                "name": "Lock",
-                "icon": "lock",
-                "description": "Lock the current session",
-                "command": ["loginctl", "lock-session"],
-                "enabled": true,
-                "dangerous": false
-            },
-            {
-                "name": "Sleep",
-                "icon": "bedtime",
-                "description": "Suspend then hibernate",
-                "command": ["suspendThenHibernate"],
-                "enabled": true,
-                "dangerous": false
-            },
-            {
-                "name": "Settings",
-                "icon": "settings",
-                "description": "Configure the shell",
-                "command": ["caelestia", "shell", "nexus", "open"],
-                "enabled": true,
-                "dangerous": false
-            }
-        ]
-    },
-    "lock": {
-        "enabled": true,
-        "useWallpaper": false,
-        "recolourLogo": true,
-        "enableFprint": true,
-        "maxFprintTries": 3,
-        "enableHowdy": true,
-        "maxHowdyTries": 3,
-        "triggerHowdyOnWake": true,
-        "hideNotifs": false
-    },
-    "nexus": {
-        "wallpapersPerRow": 4,
-        "networkRescanInterval": 15000
-    },
-    "notifs": {
-        "expire": true,
-        "fullscreen": "On",
-        "defaultExpireTimeout": 5000,
-        "fullscreenExpireTimeout": 2000,
-        "clearThreshold": 0.3,
-        "expandThreshold": 20,
-        "actionOnClick": false,
-        "groupPreviewNum": 3,
-        "openExpanded": false
-    },
-    "osd": {
-        "enabled": true,
-        "hideDelay": 2000,
-        "enableBrightness": true,
-        "enableMicrophone": false
-    },
-    "services": {
-        "weatherLocation": "",
-        "useFahrenheit": false,
-        "useFahrenheitPerformance": false,
-        "useTwelveHourClock": false,
-        "gpuType": "Auto",
-        "visualiserBars": 60,
-        "audioIncrement": 0.1,
-        "brightnessIncrement": 0.1,
-        "maxVolume": 1.0,
-        "smartScheme": true,
-        "defaultPlayer": "Spotify",
-        "playerAliases": [{ "from": "com.github.th_ch.youtube_music", "to": "YT Music" }],
-        "lyricsBackend": "Auto"
-    },
-    "session": {
-        "enabled": true,
-        "dragThreshold": 30,
-        "vimKeybinds": false,
-        "icons": {
-            "logout": "logout",
-            "shutdown": "power_settings_new",
-            "hibernate": "downloading",
-            "reboot": "cached"
-        },
-        "commands": {
-            "logout": ["logout"],
-            "shutdown": ["poweroff"],
-            "hibernate": ["hibernate"],
-            "reboot": ["reboot"]
-        }
-    },
-    "sidebar": {
-        "enabled": true,
-        "showOnHover": false,
-        "minHoverThreshold": 200,
-        "dragThreshold": 80
-    },
-    "utilities": {
-        "enabled": true,
-        "maxToasts": 4,
-        "toasts": {
-            "fullscreen": "off",
-            "configLoaded": true,
-            "chargingChanged": true,
-            "gameModeChanged": true,
-            "dndChanged": true,
-            "audioOutputChanged": true,
-            "audioInputChanged": true,
-            "capsLockChanged": true,
-            "numLockChanged": true,
-            "kbLayoutChanged": true,
-            "kbLimit": true,
-            "vpnChanged": true,
-            "nowPlaying": false
-        },
-        "vpn": {
-            "enabled": false,
-            "provider": [
-                {
-                    "name": "wireguard",
-                    "interface": "your-connection-name",
-                    "displayName": "Wireguard (Your VPN)",
-                    "enabled": false
-                }
-            ]
-        },
-        "quickToggles": [
-            {
-                "id": "wifi",
-                "enabled": true
-            },
-            {
-                "id": "bluetooth",
-                "enabled": true
-            },
-            {
-                "id": "mic",
-                "enabled": true
-            },
-            {
-                "id": "settings",
-                "enabled": true
-            },
-            {
-                "id": "gameMode",
-                "enabled": true
-            },
-            {
-                "id": "dnd",
-                "enabled": true
-            },
-            {
-                "id": "vpn",
-                "enabled": false
-            }
-        ]
-    },
-    "paths": {
-        "wallpaperDir": "~/Pictures/Wallpapers",
-        "lyricsDir": "~/Music/lyrics/",
-        "sessionGif": "root:/assets/kurukuru.gif",
-        "mediaGif": "root:/assets/bongocat.gif",
-        "noNotifsPic": "root:/assets/dino.png",
-        "lockNoNotifsPic": "root:/assets/dino.png"
-    }
-}
-```
-
-</details>
-
-### Advanced configuration
-
-> [!CAUTION]
-> Do NOT change any of these options unless you know what you are doing. These options control the
-> tokens used internally within the shell, and can cause visual issues if modified incorrectly.
-> The available options may change or be removed without notice across versions.
-
-A separate `~/.config/caelestia/shell-tokens.json` file allows editing the internal tokens without
-touching the source code of the shell. These tokens affect the dimensions and appearance of visual elements,
-including individual rounding, spacing, padding, font size, animation durations and curves, and the sizes of
-certain components. The appearance scale values in `shell.json` are multiplied against these base
-token values to produce the final computed values.
-
-Per-monitor token overrides are also available at
-`~/.config/caelestia/monitors/<monitor_name>/shell-tokens.json`.
-
-### Home Manager Module
-
-For NixOS users, a Home Manager module is also available.
-
-<details><summary><code>home.nix</code></summary>
-
-```nix
-programs.caelestia = {
-  enable = true;
-  systemd = {
-    enable = false; # if you prefer starting from your compositor
-    target = "graphical-session.target";
-    environment = [];
-  };
-  settings = {
-    bar.statusIcons = [
-      { id = "lockStatus"; enabled = true; }
-      { id = "network"; enabled = true; }
-      { id = "bluetooth"; enabled = true; }
-      { id = "battery"; enabled = false; }
-    ];
-    paths.wallpaperDir = "~/Images";
-  };
-  cli = {
-    enable = true; # Also add caelestia-cli to path
-    settings = {
-      theme.enableGtk = false;
-    };
-  };
-};
-```
-
-The module automatically adds the shell to the path with **full functionality**. The CLI is not required; however, you can enable and configure it.
-
-</details>
-
-## FAQ
-
-### Need help or support?
-
-You can join the Caelestia Discord server for assistance and discussion [here][discord].
-
-### I want to make my own changes to the Hyprland config!
-
-Check out the configuring section on the [dots repo](https://github.com/caelestia-dots/caelestia#configuring).
-
-### I want to make my own changes to other stuff!
-
-See the [manual installation](#manual-installation) section for the corresponding repo.
-
-### I want to disable ___ feature!
-
-Please read the [configuring](#configuring) section.
-If there is no corresponding option, make a [feature request](https://github.com/caelestia-dots/shell/issues/new?template=feature.yml).
-
-### How do I make my colour scheme change to match my wallpaper?
-
-Set a wallpaper via `>wallpaper` in the launcher or `caelestia wallpaper`, and set the scheme to the dynamic scheme via 
-`>scheme` in the launcher or `caelestia scheme set`, e.g.:
-
-```sh
-caelestia wallpaper -f <path_to_wallpaper>
-caelestia scheme set -n dynamic
-```
-
-### My wallpapers aren't showing up in the launcher!
-
-The launcher pulls wallpapers from `~/Pictures/Wallpapers` by default. You can change this in the config. Additionally,
-the launcher only shows an odd number of wallpapers at one time. If you only have 2 wallpapers, consider getting more
-(or just putting one).
-
-## Credits
-
-Thanks to the Hyprland Discord community (especially the homies in #rice-discussion) for all the help and suggestions
-for improving these dots!
-
-A special thanks to [@outfoxxed](https://github.com/outfoxxed) for making Quickshell and the effort put into fixing issues
-and implementing various feature requests.
-
-Another special thanks to [@end_4](https://github.com/end-4) for his [config](https://github.com/end-4/dots-hyprland)
-which helped me a lot with learning how to use Quickshell.
-
-Finally, another thank you to all the configs I took inspiration from (only one for now):
-
--   [Axenide/Ax-Shell](https://github.com/Axenide/Ax-Shell)
-
-## Stonks 📈
-
-<a href="https://www.star-history.com/#caelestia-dots/shell&Date">
- <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=caelestia-dots/shell&type=Date&theme=dark" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=caelestia-dots/shell&type=Date" />
-   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=caelestia-dots/shell&type=Date" />
- </picture>
-</a>
-
-[dots-repo]: https://github.com/caelestia-dots/caelestia
-[discord]: https://caelestiashell.com/discord
+This project remains licensed under [GPL-3.0](LICENSE).
