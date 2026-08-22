@@ -26,6 +26,11 @@ jobs:
       - name: Checkout source
         uses: actions/checkout@v7
 
+      - name: Test upstream update tooling
+        run: |
+          bash -n scripts/update-upstream scripts/test-update-upstream
+          scripts/test-update-upstream
+
       - name: CMake build
         run: |
           # Set version and git rev for CI build so we don't call git

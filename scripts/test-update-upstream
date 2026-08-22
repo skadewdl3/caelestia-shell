@@ -1,0 +1,116 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+readonly SOURCE_ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
+readonly UPDATER="$SOURCE_ROOT/scripts/update-upstream"
+readonly TEST_ROOT=$(mktemp -d)
+
+cleanup() {
+    rm -rf -- "$TEST_ROOT"
+}
+trap cleanup EXIT
+
+git_configure() {
+    git config user.name "Update test"
+    git config user.email "update-test@example.invalid"
+}
+
+create_fixture() {
+    local name=$1
+    local upstream_work="$TEST_ROOT/$name-upstream-work"
+    local upstream_bare="$TEST_ROOT/$name-upstream.git"
+    local fork="$TEST_ROOT/$name-fork"
+
+    git init --quiet --initial-branch=main "$upstream_work"
+    (
+        cd "$upstream_work"
+        git_configure
+        printf 'upstream 1\n' > shared.txt
+        git add shared.txt
+        git commit --quiet -m base
+        git tag -a v1.0.0 -m v1.0.0
+        git branch stable
+    )
+    git clone --quiet --bare "$upstream_work" "$upstream_bare"
+    git clone --quiet "$upstream_bare" "$fork"
+    (
+        cd "$fork"
+        git_configure
+        printf 'custom\n' > custom.txt
+        git add custom.txt
+        git commit --quiet -m custom
+    )
+
+    printf '%s\n%s\n%s\n' "$upstream_work" "$upstream_bare" "$fork"
+}
+
+mapfile -t fixture < <(create_fixture clean)
+upstream_work=${fixture[0]}
+upstream_bare=${fixture[1]}
+fork=${fixture[2]}
+
+(
+    cd "$fork"
+    output=$(CAELESTIA_UPSTREAM_URL="$upstream_bare" "$UPDATER" --check)
+    [[ "$output" == "main is already based on v1.0.0" ]]
+
+    printf 'dirty\n' >> custom.txt
+    if CAELESTIA_UPSTREAM_URL="$upstream_bare" "$UPDATER" --check >/dev/null 2>&1; then
+        printf 'dirty-worktree check unexpectedly succeeded\n' >&2
+        exit 1
+    fi
+    git restore custom.txt
+)
+
+(
+    cd "$upstream_work"
+    printf 'upstream 2\n' >> shared.txt
+    git add shared.txt
+    git commit --quiet -m release-2
+    git tag -a v1.1.0 -m v1.1.0
+    git branch --force stable
+    git push --quiet --force --tags "$upstream_bare" main stable
+)
+
+(
+    cd "$fork"
+    output=$(CAELESTIA_UPSTREAM_URL="$upstream_bare" "$UPDATER" --check)
+    [[ "$output" == "update available: v1.0.0 -> v1.1.0 (update/v1.1.0)" ]]
+    CAELESTIA_UPSTREAM_URL="$upstream_bare" "$UPDATER" v1.1.0 >/dev/null
+    [[ "$(git branch --show-current)" == "update/v1.1.0" ]]
+    git merge-base --is-ancestor v1.1.0 HEAD
+    [[ "$(<custom.txt)" == "custom" ]]
+)
+
+mapfile -t fixture < <(create_fixture conflict)
+upstream_work=${fixture[0]}
+upstream_bare=${fixture[1]}
+fork=${fixture[2]}
+
+(
+    cd "$fork"
+    printf 'custom version\n' > shared.txt
+    git add shared.txt
+    git commit --quiet -m conflicting-custom-change
+)
+(
+    cd "$upstream_work"
+    printf 'upstream version\n' > shared.txt
+    git add shared.txt
+    git commit --quiet -m conflicting-release-change
+    git tag -a v1.1.0 -m v1.1.0
+    git branch --force stable
+    git push --quiet --force --tags "$upstream_bare" main stable
+)
+(
+    cd "$fork"
+    if CAELESTIA_UPSTREAM_URL="$upstream_bare" "$UPDATER" --ci >/dev/null 2>&1; then
+        printf 'conflicting rebase unexpectedly succeeded\n' >&2
+        exit 1
+    fi
+    [[ "$(git branch --show-current)" == "main" ]]
+    [[ ! -d .git/rebase-merge && ! -d .git/rebase-apply ]]
+)
+
+printf 'update-upstream tests passed\n'
