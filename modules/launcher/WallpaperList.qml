@@ -15,8 +15,8 @@ PathView {
     required property var panels
     required property var content
 
+    property string displaySearch
     readonly property int itemWidth: Tokens.sizes.launcher.wallpaperWidth * 0.8 + Tokens.padding.medium * 2
-
     readonly property int numItems: {
         const screen = (QsWindow.window as QsWindow)?.screen;
         if (!screen)
@@ -44,16 +44,28 @@ PathView {
         return visible;
     }
 
+    function flushSearch(): bool {
+        if (!searchThrottle.running)
+            return false;
+
+        searchThrottle.stop();
+        displaySearch = search.text.split(" ").slice(1).join(" ");
+        return true;
+    }
+
     model: ScriptModel {
         id: scriptModel
 
-        readonly property string search: root.search.text.split(" ").slice(1).join(" ")
+        readonly property string search: root.displaySearch
 
         values: Wallpapers.query(search)
         onValuesChanged: root.currentIndex = search ? 0 : values.findIndex(w => w.path === Wallpapers.actualCurrent)
     }
 
-    Component.onCompleted: currentIndex = Wallpapers.list.findIndex(w => w.path === Wallpapers.actualCurrent)
+    Component.onCompleted: {
+        displaySearch = search.text.split(" ").slice(1).join(" ");
+        currentIndex = Wallpapers.list.findIndex(w => w.path === Wallpapers.actualCurrent);
+    }
     Component.onDestruction: Wallpapers.stopPreview()
 
     onCurrentItemChanged: {
@@ -93,5 +105,20 @@ PathView {
             x: root.width
             relativeY: 0
         }
+    }
+
+    Timer {
+        id: searchThrottle
+
+        interval: 80
+        onTriggered: root.displaySearch = root.search.text.split(" ").slice(1).join(" ")
+    }
+
+    Connections {
+        function onTextChanged(): void {
+            searchThrottle.restart();
+        }
+
+        target: root.search
     }
 }
