@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+config_file="${CAELESTIA_GREETER_CONFIG:-/etc/caelestia-greeter/config}"
+if [[ -r "$config_file" ]]; then
+    set -a
+    # The system administrator owns this file. It contains shell-style KEY=VALUE entries.
+    # shellcheck disable=SC1090
+    source "$config_file"
+    set +a
+fi
+
+export HOME="${CAELESTIA_GREETER_HOME:-/var/lib/caelestia-greeter}"
+export XDG_CACHE_HOME="${CAELESTIA_GREETER_CACHE_HOME:-/var/cache/caelestia-greeter}"
+export XDG_CONFIG_HOME="${CAELESTIA_GREETER_CONFIG_HOME:-/etc/caelestia-greeter}"
+export XDG_RUNTIME_DIR="${CAELESTIA_GREETER_RUNTIME_DIR:-/run/caelestia-greeter}"
+export QT_QPA_PLATFORM=wayland
+export QT_QUICK_CONTROLS_STYLE=Basic
+export QT_WAYLAND_DISABLE_WINDOWDECORATION=1
+export CAELESTIA_GREETER_QML="${CAELESTIA_GREETER_QML:-@GREETER_QSCONFDIR@/greeter.qml}"
+export CAELESTIA_GREETER_INFO="${CAELESTIA_GREETER_INFO:-@GREETER_LIBEXECDIR@/system-info}"
+export CAELESTIA_GREETER_SESSION="${CAELESTIA_GREETER_SESSION:-@GREETER_LIBEXECDIR@/start-session}"
+
+if [[ -z "${CAELESTIA_GREETER_USER:-}" ]]; then
+    printf 'Set CAELESTIA_GREETER_USER in %s.\n' "$config_file" >&2
+    exit 1
+fi
+
+if [[ -n "${WAYLAND_DISPLAY:-}" ]]; then
+    exec qs -p "$CAELESTIA_GREETER_QML"
+fi
+
+# Do not leave compositor logs in the console buffer exposed during handoff.
+if [[ -c /dev/tty ]]; then
+    printf '\033[40m\033[2J\033[3J\033[H\033[?25l' > /dev/tty 2>/dev/null || true
+fi
+
+exec cage -s -- qs -p "$CAELESTIA_GREETER_QML" </dev/null >/dev/null 2>&1

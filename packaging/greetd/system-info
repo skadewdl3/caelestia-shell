@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+
+set -u
+
+cpu_temp="--"
+for name_file in /sys/class/hwmon/hwmon*/name; do
+    [[ -r "$name_file" ]] || continue
+    [[ "$(<"$name_file")" == "k10temp" ]] || continue
+
+    hwmon_dir="${name_file%/name}"
+    for temp_file in "$hwmon_dir"/temp*_input; do
+        [[ -r "$temp_file" ]] || continue
+        temperature="$(<"$temp_file")"
+        [[ "$temperature" =~ ^[0-9]+$ ]] || continue
+        cpu_temp="$(( (temperature + 500) / 1000 ))"
+        break 2
+    done
+done
+
+memory_percent="$(awk '/MemTotal:/ { total=$2 } /MemAvailable:/ { available=$2 } END { if (total > 0) printf "%.0f", (total-available)*100/total; else print "--" }' /proc/meminfo)"
+disk_percent="$(df -P / 2>/dev/null | awk 'NR == 2 { gsub(/%/, "", $5); print $5 }')"
+
+uptime_seconds="$(cut -d. -f1 /proc/uptime)"
+if (( uptime_seconds >= 86400 )); then
+    uptime_text="$((uptime_seconds / 86400))d $(((uptime_seconds % 86400) / 3600))h"
+elif (( uptime_seconds >= 3600 )); then
+    uptime_text="$((uptime_seconds / 3600))h $(((uptime_seconds % 3600) / 60))m"
+else
+    uptime_text="$((uptime_seconds / 60)) min"
+fi
+
+network_name="$(nmcli -t -f TYPE,STATE,CONNECTION device status 2>/dev/null | awk -F: '$1 == "wifi" && $2 == "connected" { print $3; exit }')"
+network_name="${network_name//\\:/:}"
+[[ -n "$network_name" ]] || network_name="Disconnected"
+
+battery_percent="--"
+battery_status="Unavailable"
+for power_dir in /sys/class/power_supply/*; do
+    [[ -r "$power_dir/type" ]] || continue
+    [[ "$(<"$power_dir/type")" == "Battery" ]] || continue
+    [[ -r "$power_dir/capacity" ]] && battery_percent="$(<"$power_dir/capacity")"
+    [[ -r "$power_dir/status" ]] && battery_status="$(<"$power_dir/status")"
+    break
+done
+
+os_name="Linux"
+if [[ -r /etc/os-release ]]; then
+    # shellcheck disable=SC1091
+    source /etc/os-release
+    os_name="${NAME:-Linux}"
+fi
+
+printf 'cpu_temp=%s\n' "$cpu_temp"
+printf 'memory_percent=%s\n' "$memory_percent"
+printf 'disk_percent=%s\n' "${disk_percent:---}"
+printf 'uptime=%s\n' "$uptime_text"
+printf 'network=%s\n' "$network_name"
+printf 'battery_percent=%s\n' "$battery_percent"
+printf 'battery_status=%s\n' "$battery_status"
+printf 'os=%s\n' "$os_name"
+printf 'kernel=%s\n' "$(uname -r)"
+printf 'hostname=%s\n' "$(hostname)"
