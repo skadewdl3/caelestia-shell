@@ -7,6 +7,7 @@ import Caelestia.I18n
 import qs.components
 import qs.components.controls
 import qs.services
+import qs.services as Services
 import qs.modules.launcher.services
 
 Item {
@@ -18,9 +19,65 @@ Item {
 
     readonly property int padding: Tokens.padding.large
     readonly property int rounding: Tokens.rounding.extraLarge
+    readonly property real listBottomMargin: list.showClips ? shortcutHint.implicitHeight + Tokens.spacing.small * 2 : padding
+
+    function applyLauncherQuery(): void {
+        const query = root.screenState.launcherQuery;
+        if (!query)
+            return;
+
+        search.text = query;
+        root.screenState.launcherQuery = "";
+        search.forceActiveFocus();
+    }
+
+    function activateCurrentItem(): void {
+        const currentItem = list.currentList?.currentItem;
+        if (currentItem) {
+            if (list.showWallpapers) {
+                if (Colours.scheme === "dynamic" && currentItem.modelData.path !== Wallpapers.actualCurrent)
+                    Wallpapers.previewColourLock = true;
+                Wallpapers.setWallpaper(currentItem.modelData.path);
+                root.screenState.launcher = false;
+            } else if (search.text.startsWith(GlobalConfig.launcher.actionPrefix)) {
+                if (search.text.startsWith(`${GlobalConfig.launcher.actionPrefix}calc `))
+                    currentItem.onClicked();
+                else if (list.showClips)
+                    Services.Clipboard.activate(currentItem.modelData, list.currentList);
+                else
+                    currentItem.modelData.onClicked(list.currentList);
+            } else {
+                Apps.launch(currentItem.modelData);
+                root.screenState.launcher = false;
+            }
+        }
+    }
+
+    function handleClipboardShortcut(event: var): bool {
+        if (!list.showClips)
+            return false;
+
+        const entry = list.currentList?.currentItem?.modelData;
+        if (!entry)
+            return false;
+
+        if (event.key === Qt.Key_Delete && (event.modifiers & Qt.ShiftModifier)) {
+            if (!event.isAutoRepeat)
+                Services.Clipboard.deleteEntry(entry);
+            return true;
+        }
+
+        if (event.key === Qt.Key_P && (event.modifiers & Qt.ControlModifier)) {
+            if (!event.isAutoRepeat)
+                Services.Clipboard.togglePinned(entry);
+            return true;
+        }
+
+        return false;
+    }
 
     implicitWidth: listWrapper.width + padding * 2
-    implicitHeight: search.height + listWrapper.height + padding + search.anchors.bottomMargin
+    implicitHeight: search.height + listWrapper.height + listBottomMargin + search.anchors.bottomMargin
 
     Item {
         id: listWrapper
@@ -30,7 +87,7 @@ Item {
 
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.bottom: search.top
-        anchors.bottomMargin: root.padding
+        anchors.bottomMargin: root.listBottomMargin
 
         ContentList {
             id: list
@@ -38,10 +95,30 @@ Item {
             content: root
             screenState: root.screenState
             panels: root.panels
-            maxHeight: root.maxHeight - search.implicitHeight - root.padding * 3
+            maxHeight: root.maxHeight - search.implicitHeight - root.padding * 2 - root.listBottomMargin
             search: search
             padding: root.padding
             rounding: root.rounding
+        }
+    }
+
+    StyledText {
+        id: shortcutHint
+
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.bottom: search.top
+        anchors.bottomMargin: Tokens.spacing.small
+
+        text: qsTr("Ctrl+P: pin/unpin    Shift+Delete: delete")
+        color: Colours.palette.m3outline
+        font: Tokens.font.label.small
+        opacity: list.showClips ? 1 : 0
+        visible: opacity > 0
+
+        Behavior on opacity {
+            Anim {
+                type: Anim.DefaultEffects
+            }
         }
     }
 
@@ -62,23 +139,13 @@ Item {
         placeholderText: Tr.tr("Type \"%1\" for commands").arg(GlobalConfig.launcher.actionPrefix)
 
         onAccepted: {
-            const currentItem = list.currentList?.currentItem;
-            if (currentItem) {
-                if (list.showWallpapers) {
-                    if (Colours.scheme === "dynamic" && currentItem.modelData.path !== Wallpapers.actualCurrent)
-                        Wallpapers.previewColourLock = true;
-                    Wallpapers.setWallpaper(currentItem.modelData.path);
-                    root.screenState.launcher = false;
-                } else if (text.startsWith(GlobalConfig.launcher.actionPrefix)) {
-                    if (text.startsWith(`${GlobalConfig.launcher.actionPrefix}calc `))
-                        currentItem.onClicked();
-                    else
-                        currentItem.modelData.onClicked(list.currentList);
-                } else {
-                    Apps.launch(currentItem.modelData);
-                    root.screenState.launcher = false;
-                }
+            const currentList = list.currentList;
+            if (currentList && typeof currentList.flushSearch === "function" && currentList.flushSearch()) {
+                Qt.callLater(root.activateCurrentItem);
+                return;
             }
+
+            root.activateCurrentItem();
         }
 
         Keys.onUpPressed: list.currentList?.decrementCurrentIndex()
@@ -87,6 +154,11 @@ Item {
         Keys.onEscapePressed: root.screenState.launcher = false
 
         Keys.onPressed: event => {
+            if (root.handleClipboardShortcut(event)) {
+                event.accepted = true;
+                return;
+            }
+
             if (!GlobalConfig.launcher.vimKeybinds)
                 return;
 
@@ -107,12 +179,22 @@ Item {
             }
         }
 
-        Component.onCompleted: forceActiveFocus()
+        Component.onCompleted: {
+            root.applyLauncherQuery();
+            forceActiveFocus();
+        }
 
         Connections {
             function onLauncherChanged(): void {
                 if (!root.screenState.launcher)
                     search.text = "";
+                else
+                    root.applyLauncherQuery();
+            }
+
+            function onLauncherQueryChanged(): void {
+                if (root.screenState.launcher)
+                    root.applyLauncherQuery();
             }
 
             function onSessionChanged(): void {

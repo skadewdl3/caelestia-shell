@@ -91,6 +91,8 @@ Dependencies:
 -   `qt6-imageformats`
 -   [`qt6-m3shapes-git`](https://github.com/soramanew/m3shapes)
 -   [`swappy`](https://github.com/jtheoof/swappy)
+-   [`cliphist`](https://github.com/sentriz/cliphist)
+-   [`wl-clipboard`](https://github.com/bugaevc/wl-clipboard)
 -   [`fish`](https://github.com/fish-shell/fish-shell)
 -   [`bash`](https://www.gnu.org/software/bash)
 
