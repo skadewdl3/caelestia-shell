@@ -2,6 +2,7 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 import QtQuick.Layouts
+import Quickshell
 import Caelestia.Components
 import Caelestia.Config
 import Caelestia.I18n
@@ -9,6 +10,7 @@ import qs.components
 import qs.components.controls
 import qs.components.misc
 import qs.services
+import qs.utils
 
 StyledRect {
     id: root
@@ -123,7 +125,7 @@ StyledRect {
             asynchronous: true
             Layout.fillWidth: true
             Layout.preferredHeight: implicitHeight
-            sourceComponent: running ? recordingControls : recordingList
+            sourceComponent: running ? recordingControls : recordingsFolderButton
             clip: Layout.preferredHeight < implicitHeight
 
             Behavior on Layout.preferredHeight {
@@ -172,11 +174,19 @@ StyledRect {
     }
 
     Component {
-        id: recordingList
+        id: recordingsFolderButton
 
-        RecordingList {
-            props: root.props
-            screenState: root.screenState
+        IconTextButton {
+            Layout.fillWidth: true
+            type: IconTextButton.Tonal
+            icon: "folder"
+            text: Tr.tr("Open recordings folder")
+
+            onClicked: {
+                root.screenState.utilities = false;
+                root.screenState.sidebar = false;
+                Quickshell.execDetached([...GlobalConfig.general.apps.explorer, Paths.recsdir]);
+            }
         }
     }
 
