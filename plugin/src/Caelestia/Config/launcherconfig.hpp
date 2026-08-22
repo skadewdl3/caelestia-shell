@@ -56,6 +56,12 @@ class LauncherConfig : public ConfigObject {
                 { u"command"_s, QStringList{ u"autocomplete"_s, u"clip"_s } },
             }),
             vmap({
+                { u"name"_s, u"Emoji"_s },
+                { u"icon"_s, u"emoji_emotions"_s },
+                { u"description"_s, u"Search emojis and glyphs"_s },
+                { u"command"_s, QStringList{ u"autocomplete"_s, u"emoji"_s } },
+            }),
+            vmap({
                 { u"name"_s, u"Scheme"_s },
                 { u"icon"_s, u"palette"_s },
                 { u"description"_s, u"Change the current colour scheme"_s },

@@ -7,6 +7,7 @@ import qs.components
 import qs.components.containers
 import qs.components.controls
 import qs.services
+import qs.services as Services
 import qs.modules.launcher.items
 import qs.modules.launcher.services
 
@@ -20,7 +21,7 @@ StyledListView {
 
     readonly property string requestedState: stateForText(search.text)
     readonly property string displayState: stateForText(displayText)
-    readonly property bool fastList: state === "clip"
+    readonly property bool fastList: state === "clip" || state === "emoji"
 
     function syncDisplayText(): void {
         if (screenState.launcher && requestedState === displayState && displayText !== search.text)
@@ -46,6 +47,9 @@ StyledListView {
             if (text === `${prefix}clip` || text.startsWith(`${prefix}clip `))
                 return "clip";
 
+            if (text === `${prefix}emoji` || text.startsWith(`${prefix}emoji `))
+                return "emoji";
+
             return "actions";
         }
 
@@ -60,6 +64,8 @@ StyledListView {
             return [0];
         case "clip":
             return Clips.query(text);
+        case "emoji":
+            return Emojis.query(text);
         case "scheme":
             return Schemes.query(text);
         case "variant":
@@ -106,6 +112,8 @@ StyledListView {
     onStateChanged: {
         if (state === "clip")
             Clipboard.reload();
+        else if (state === "emoji")
+            Services.Emojis.reload();
         else if (state === "scheme" || state === "variant")
             Schemes.reload();
     }
@@ -139,6 +147,13 @@ StyledListView {
 
             PropertyChanges {
                 root.delegate: clipboardItem
+            }
+        },
+        State {
+            name: "emoji"
+
+            PropertyChanges {
+                root.delegate: emojiItem
             }
         },
         State {
@@ -312,6 +327,14 @@ StyledListView {
         id: clipboardItem
 
         ClipboardItem {
+            list: root
+        }
+    }
+
+    Component {
+        id: emojiItem
+
+        EmojiItem {
             list: root
         }
     }
