@@ -24,11 +24,6 @@ repository permissions and allow GitHub Actions to create pull requests. Keep
 `main` configured so the promotion workflow can force-push; the workflow uses
 an exact lease and is the only automated path allowed to replace it.
 
-Run the existing **Update Docker CI image** workflow once before the first
-update PR. It publishes `ghcr.io/skadewdl3/shell-arch-env:latest`, which the
-inherited build, QML lint, and formatting jobs use. Confirm that Actions for
-this repository can read the package if its initial visibility is private.
-
 ## Prepare an update locally
 
 Start from a clean, current `main`:
@@ -58,22 +53,22 @@ workflow; it will open the review PR without replacing the branch.
 ## Review and promote
 
 The daily workflow performs the same checked rebase. A clean update is pushed
-as `update/vX.Y.Z` and receives a PR so the complete build and lint suite can
-run. A conflict produces an issue listing the affected paths.
+as `update/vX.Y.Z` and receives a PR for review. A conflict is listed in the
+workflow run summary and requires a local rebase.
 
-The update PR is a review and CI surface only. Do not use GitHub's merge,
-squash, or rebase buttons: those operations do not produce the desired rebased
-history. Compare the resulting trees locally with:
+The update PR is a review surface only. Do not use GitHub's merge, squash, or
+rebase buttons: those operations do not produce the desired rebased history.
+Compare the resulting trees locally with:
 
 ```sh
 git fetch origin
 git diff origin/main..origin/update/vX.Y.Z
 ```
 
-After every PR check succeeds, manually run **Promote upstream update** with
-the PR number. It validates the exact tested SHA, creates
-`archive/pre-vX.Y.Z` at the old `main`, and moves `main` using an exact
-force-with-lease. The update branch is then removed.
+After reviewing the PR, manually run **Promote upstream update** with the PR
+number. It validates the exact reviewed SHA, creates `archive/pre-vX.Y.Z` at
+the old `main`, and moves `main` using an exact force-with-lease. The update
+branch is then removed.
 
 ## Roll back
 
