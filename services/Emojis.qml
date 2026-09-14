@@ -74,6 +74,7 @@ Singleton {
         root.recordUse(entry.glyph);
         list.screenState.launcher = false;
         Quickshell.execDetached(["wl-copy", entry.glyph]);
+        Quickshell.execDetached(["notify-send", "-a", "caelestia-shell", "-u", "low", qsTr("Copied %1 to clipboard").arg(entry.glyph)]);
     }
 
     Component.onCompleted: reload()

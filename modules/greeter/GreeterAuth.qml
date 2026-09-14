@@ -13,10 +13,37 @@ Scope {
     property bool authenticating
     property bool submittedPassword
     property bool handoff
+    property bool launchRequested
     property string errorMessage
     property string password
+    property string buffer
 
     signal retryRequested
+
+    function handleKey(event: KeyEvent): void {
+        if (authenticating || handoff)
+            return;
+
+        if (event.key === Qt.Key_Enter || event.key === Qt.Key_Return) {
+            submitBuffer();
+            event.accepted = true;
+        } else if (event.key === Qt.Key_Backspace) {
+            if (event.modifiers & Qt.ControlModifier)
+                buffer = "";
+            else
+                buffer = buffer.slice(0, -1);
+            event.accepted = true;
+        } else if (/^[^\x00-\x1F\x7F-\x9F]+$/.test(event.text)) {
+            buffer += event.text;
+            event.accepted = true;
+        }
+    }
+
+    function submitBuffer(): void {
+        if (!buffer.length)
+            return;
+        authenticate(buffer);
+    }
 
     function authenticate(password: string): void {
         if (authenticating || password.length === 0)
@@ -41,11 +68,21 @@ Scope {
 
     function fail(message: string): void {
         root.password = "";
+        root.buffer = "";
         root.authenticating = false;
         root.submittedPassword = false;
         root.handoff = false;
+        root.launchRequested = false;
         root.errorMessage = message || "Authentication failed";
         root.retryRequested();
+    }
+
+    function launchSession(): void {
+        if (!root.handoff || root.launchRequested || !Greetd.available)
+            return;
+
+        root.launchRequested = true;
+        Greetd.launch([root.sessionScript], ["XDG_CURRENT_DESKTOP=Hyprland", "XDG_SESSION_DESKTOP=Hyprland", "XDG_SESSION_TYPE=wayland"], true);
     }
 
     Connections {
@@ -62,6 +99,7 @@ Scope {
                 root.submittedPassword = true;
                 Greetd.respond(root.password);
                 root.password = "";
+                root.buffer = "";
             } else {
                 Greetd.respond("");
             }
@@ -73,8 +111,8 @@ Scope {
 
         function onReadyToLaunch(): void {
             root.password = "";
+            root.buffer = "";
             root.handoff = true;
-            handoffTimer.restart();
         }
 
         function onError(message: string): void {
@@ -86,12 +124,5 @@ Scope {
         }
 
         target: Greetd
-    }
-
-    Timer {
-        id: handoffTimer
-
-        interval: 180
-        onTriggered: Greetd.launch([root.sessionScript], ["XDG_CURRENT_DESKTOP=Hyprland", "XDG_SESSION_DESKTOP=Hyprland", "XDG_SESSION_TYPE=wayland"], true)
     }
 }

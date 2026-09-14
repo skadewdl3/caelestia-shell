@@ -13,33 +13,21 @@ FocusScope {
     required property GreeterAuth auth
     required property bool primary
 
-    readonly property color background: "#110e08"
-    readonly property color surface: "#110e08"
-    readonly property color surfaceContainer: "#1e1910"
-    readonly property color surfaceContainerHigh: "#241f14"
-    readonly property color surfaceContainerHighest: "#2b2519"
-    readonly property color surfaceInk: "#f1e4d1"
-    readonly property color surfaceMuted: "#b5aa98"
-    readonly property color primaryColour: "#e1c387"
-    readonly property color primaryInk: "#513d0e"
-    readonly property color primaryContainer: "#654f1f"
-    readonly property color secondary: "#d5c4a1"
-    readonly property color outline: "#7e7464"
-    readonly property color error: "#f97758"
-    readonly property string bodyFont: "GoogleSansFlex"
-    readonly property string monoFont: "CaskaydiaCove Nerd Font Mono"
-    readonly property string iconFont: "Material Symbols Rounded"
+    readonly property GreeterTheme theme: GreeterTheme {}
     readonly property string infoCommand: Quickshell.env("CAELESTIA_GREETER_INFO") || Quickshell.shellPath("packaging/greetd/system-info")
     readonly property string backgroundSource: Quickshell.env("CAELESTIA_GREETER_BACKGROUND") || Quickshell.shellPath("assets/wallpaper.webp")
+    readonly property real panelHeight: height * 0.7
+    readonly property real panelWidth: panelHeight * 16 / 9
+    readonly property real compactSize: lockIcon.implicitHeight + theme.spacingLarge * 4
 
     property date now: new Date()
     property string cpuTemp: "--"
     property string memoryPercent: "--"
     property string diskPercent: "--"
     property string uptimeText: "--"
-    property string networkName: "Checking..."
+    property string networkName: qsTr("Checking...")
     property string batteryPercent: "--"
-    property string batteryStatus: "Checking..."
+    property string batteryStatus: qsTr("Checking...")
     property string osName: "Linux"
     property string kernelVersion: "--"
     property string hostName: Quickshell.env("HOSTNAME") || "localhost"
@@ -56,114 +44,122 @@ FocusScope {
         memoryPercent = values.memory_percent || "--";
         diskPercent = values.disk_percent || "--";
         uptimeText = values.uptime || "--";
-        networkName = values.network || "Disconnected";
+        networkName = values.network || qsTr("Disconnected");
         batteryPercent = values.battery_percent || "--";
-        batteryStatus = values.battery_status || "Unavailable";
+        batteryStatus = values.battery_status || qsTr("Unavailable");
         osName = values.os || "Linux";
         kernelVersion = values.kernel || "--";
         hostName = values.hostname || hostName;
     }
 
-    function submitPassword(): void {
-        const password = passwordField.text;
-        passwordField.clear();
-        auth.authenticate(password);
-    }
-
     focus: primary
-    Component.onCompleted: {
-        if (primary)
-            passwordField.forceActiveFocus();
-    }
 
     Connections {
         function onRetryRequested(): void {
-            passwordField.clear();
             if (root.primary)
-                passwordField.forceActiveFocus();
+                center.forcePasswordFocus();
+        }
+
+        function onHandoffChanged(): void {
+            if (!root.auth.handoff)
+                return;
+            initAnimation.stop();
+            exitAnimation.start();
         }
 
         target: root.auth
     }
 
-    Image {
-        anchors.fill: parent
-        source: root.backgroundSource
-        fillMode: Image.PreserveAspectCrop
-        asynchronous: true
-        cache: true
+    Item {
+        id: backgroundLayer
 
-        layer.enabled: true
-        layer.effect: MultiEffect {
-            autoPaddingEnabled: false
-            blurEnabled: true
-            blur: 0.45
-            blurMax: 32
+        anchors.fill: parent
+        opacity: 0
+
+        Image {
+            anchors.fill: parent
+            source: root.backgroundSource
+            fillMode: Image.PreserveAspectCrop
+            asynchronous: true
+            cache: true
+
+            layer.enabled: true
+            layer.effect: MultiEffect {
+                autoPaddingEnabled: false
+                blurEnabled: true
+                blur: 1
+                blurMax: 64
+                blurMultiplier: 1
+            }
         }
-    }
 
-    Rectangle {
-        anchors.fill: parent
-        color: "#55000000"
+        Rectangle {
+            anchors.fill: parent
+            color: "#55000000"
+        }
     }
 
     Rectangle {
         id: dashboard
 
         anchors.centerIn: parent
-        width: Math.min(parent.width * 0.88, 1380)
-        height: Math.min(parent.height * 0.76, 780)
-        radius: 28
-        color: Qt.rgba(root.surface.r, root.surface.g, root.surface.b, 0.94)
-        border.width: 1
-        border.color: Qt.rgba(root.primaryColour.r, root.primaryColour.g, root.primaryColour.b, 0.18)
+        implicitWidth: root.compactSize
+        implicitHeight: root.compactSize
+        radius: root.compactSize / 4
+        color: root.theme.surface
+        opacity: 0.94
+        rotation: 180
+        scale: 0
 
         layer.enabled: true
         layer.effect: MultiEffect {
             shadowEnabled: true
-            shadowBlur: 0.8
-            shadowVerticalOffset: 10
-            shadowColor: "#99000000"
+            blurMax: 15
+            shadowColor: Qt.alpha(root.theme.shadow, 0.7)
         }
 
         RowLayout {
-            anchors.fill: parent
-            anchors.margins: Math.max(16, dashboard.width * 0.019)
-            spacing: 18
+            id: dashboardContent
+
+            anchors.centerIn: parent
+            width: root.panelWidth - 32
+            height: root.panelHeight - 32
+            spacing: root.theme.spacingLargeIncreased * 2
+            opacity: 0
+            scale: 0
 
             ColumnLayout {
-                Layout.preferredWidth: dashboard.width * 0.275
+                Layout.fillWidth: true
                 Layout.fillHeight: true
-                spacing: 12
+                spacing: root.theme.spacingMedium
 
                 Card {
                     Layout.fillWidth: true
-                    Layout.preferredHeight: dashboard.height * 0.23
-                    radius: 24
+                    Layout.preferredHeight: dashboardContent.height * 0.24
+                    radius: 12
+                    bottomLeftRadius: 28
 
                     ColumnLayout {
                         anchors.fill: parent
-                        anchors.margins: 20
-                        spacing: 6
+                        anchors.margins: root.theme.spacingExtraLarge
+                        spacing: root.theme.spacingSmall
 
                         SectionLabel {
-                            text: "NETWORK"
+                            text: qsTr("NETWORK")
                         }
                         Item {
                             Layout.fillHeight: true
                         }
-
                         RowLayout {
                             Layout.fillWidth: true
-                            spacing: 12
+                            spacing: root.theme.spacingMedium
 
                             MaterialGlyph {
-                                text: root.networkName === "Disconnected" ? "wifi_off" : "wifi"
-                                color: root.primaryColour
-                                font.pixelSize: 34
+                                text: root.networkName === qsTr("Disconnected") ? "wifi_off" : "wifi"
+                                color: root.theme.primary
+                                font.pointSize: 26
                                 fill: 1
                             }
-
                             ColumnLayout {
                                 Layout.fillWidth: true
                                 spacing: 1
@@ -171,14 +167,13 @@ FocusScope {
                                 BodyText {
                                     Layout.fillWidth: true
                                     text: root.networkName
-                                    font.pixelSize: 17
+                                    font.pointSize: 16
                                     font.weight: Font.DemiBold
                                     elide: Text.ElideRight
                                 }
                                 BodyText {
-                                    text: root.networkName === "Disconnected" ? "No active Wi-Fi" : "Connected"
-                                    color: root.outline
-                                    font.pixelSize: 12
+                                    text: root.networkName === qsTr("Disconnected") ? qsTr("No active Wi-Fi") : qsTr("Connected")
+                                    color: root.theme.outline
                                 }
                             }
                         }
@@ -188,101 +183,142 @@ FocusScope {
                 Card {
                     Layout.fillWidth: true
                     Layout.fillHeight: true
-                    radius: 10
+                    radius: 12
 
                     ColumnLayout {
                         anchors.fill: parent
-                        anchors.margins: 20
-                        spacing: 9
+                        anchors.margins: root.theme.spacingExtraLarge
+                        spacing: root.theme.spacingMedium
 
-                        SectionLabel {
-                            text: "SYSTEM"
+                        RowLayout {
+                            Layout.fillWidth: true
+                            spacing: root.theme.spacingMedium
+
+                            Rectangle {
+                                implicitWidth: fetchPrompt.implicitWidth + root.theme.spacingMedium * 2
+                                implicitHeight: fetchPrompt.implicitHeight + root.theme.spacingSmall * 2
+                                color: root.theme.primary
+                                radius: 12
+
+                                MonoText {
+                                    id: fetchPrompt
+
+                                    anchors.centerIn: parent
+                                    text: ">"
+                                    color: root.theme.primaryText
+                                }
+                            }
+                            MonoText {
+                                Layout.fillWidth: true
+                                text: "caelestiafetch.sh"
+                                elide: Text.ElideRight
+                            }
                         }
-                        Item {
-                            Layout.preferredHeight: 2
-                        }
-                        FetchLine {
-                            label: "host"
-                            value: root.hostName
-                        }
-                        FetchLine {
-                            label: "os"
-                            value: root.osName
-                        }
-                        FetchLine {
-                            label: "kernel"
-                            value: root.kernelVersion
-                        }
-                        FetchLine {
-                            label: "session"
-                            value: "Hyprland / UWSM"
-                        }
-                        Item {
+
+                        RowLayout {
+                            Layout.fillWidth: true
                             Layout.fillHeight: true
+                            spacing: root.theme.spacingExtraLarge
+
+                            Item {
+                                Layout.preferredWidth: 112
+                                Layout.preferredHeight: 112
+
+                                MaterialShape {
+                                    anchors.centerIn: parent
+                                    implicitSize: 112
+                                    shape: MaterialShape.Gem
+                                    color: root.theme.primaryContainer
+                                    rotation: 18
+                                }
+                                BodyText {
+                                    anchors.centerIn: parent
+                                    text: "C"
+                                    color: root.theme.primary
+                                    font.pointSize: 52
+                                    font.weight: Font.Black
+                                    font.variableAxes: ({
+                                            "wdth": 42,
+                                            "ROND": 20
+                                        })
+                                }
+                            }
+
+                            ColumnLayout {
+                                Layout.fillWidth: true
+                                spacing: root.theme.spacingMedium
+
+                                FetchLine {
+                                    label: "OS"
+                                    value: root.osName
+                                }
+                                FetchLine {
+                                    label: "KERNEL"
+                                    value: root.kernelVersion
+                                }
+                                FetchLine {
+                                    label: "USER"
+                                    value: root.auth.username
+                                }
+                                FetchLine {
+                                    label: "UP"
+                                    value: root.uptimeText
+                                }
+                            }
                         }
 
-                        Item {
+                        RowLayout {
                             Layout.alignment: Qt.AlignHCenter
-                            implicitWidth: 155
-                            implicitHeight: 118
+                            spacing: root.theme.spacingLargeIncreased
 
-                            MaterialShape {
-                                anchors.centerIn: parent
-                                implicitSize: 112
-                                shape: MaterialShape.Gem
-                                color: root.primaryContainer
-                                rotation: 18
+                            Repeater {
+                                model: root.theme.termColours
+
+                                Rectangle {
+                                    required property color modelData
+
+                                    implicitWidth: 28
+                                    implicitHeight: 28
+                                    radius: 12
+                                    color: modelData
+                                }
                             }
-                            BodyText {
-                                anchors.centerIn: parent
-                                text: "C"
-                                color: root.primaryColour
-                                font.pixelSize: 68
-                                font.weight: Font.Black
-                                font.variableAxes: ({
-                                        "wdth": 42,
-                                        "ROND": 20
-                                    })
-                            }
-                        }
-                        Item {
-                            Layout.fillHeight: true
                         }
                     }
                 }
 
                 Card {
                     Layout.fillWidth: true
-                    Layout.preferredHeight: dashboard.height * 0.2
-                    radius: 10
+                    Layout.preferredHeight: dashboardContent.height * 0.2
+                    radius: 12
 
                     ColumnLayout {
                         anchors.fill: parent
-                        anchors.margins: 18
+                        anchors.margins: root.theme.spacingLargeIncreased
 
                         SectionLabel {
-                            text: "POWER"
+                            text: qsTr("POWER")
                         }
                         Item {
                             Layout.fillHeight: true
                         }
                         RowLayout {
                             Layout.alignment: Qt.AlignHCenter
-                            spacing: 18
+                            spacing: root.theme.spacingLargeIncreased
 
                             PowerAction {
                                 icon: "bedtime"
-                                label: "Suspend"
+                                label: qsTr("Suspend")
                                 command: ["systemctl", "suspend"]
                             }
                             PowerAction {
                                 icon: "restart_alt"
-                                label: "Restart"
+                                label: qsTr("Restart")
                                 command: ["systemctl", "reboot"]
                             }
                             PowerAction {
                                 icon: "power_settings_new"
-                                label: "Power off"
+                                label: qsTr("Power off")
                                 command: ["systemctl", "poweroff"]
                                 danger: true
                             }
@@ -294,257 +330,91 @@ FocusScope {
                 }
             }
 
-            ColumnLayout {
-                Layout.preferredWidth: dashboard.width * 0.35
-                Layout.fillHeight: true
-                spacing: 0
+            GreeterCenter {
+                id: center
 
-                Item {
-                    Layout.fillHeight: true
-                }
-
-                Row {
-                    Layout.alignment: Qt.AlignHCenter
-                    spacing: 4
-
-                    DisplayText {
-                        text: Qt.formatTime(root.now, "hh")
-                        font.pixelSize: Math.min(142, dashboard.height * 0.19)
-                    }
-
-                    Column {
-                        anchors.verticalCenter: parent.verticalCenter
-                        spacing: 2
-
-                        DisplayText {
-                            text: Qt.formatTime(root.now, "mm")
-                            color: root.secondary
-                            font.pixelSize: Math.min(66, dashboard.height * 0.09)
-                        }
-
-                        Rectangle {
-                            width: minutePeriod.implicitWidth + 22
-                            height: minutePeriod.implicitHeight + 12
-                            radius: 10
-                            color: root.surfaceContainerHigh
-
-                            DisplayText {
-                                id: minutePeriod
-
-                                anchors.centerIn: parent
-                                text: Qt.formatTime(root.now, "AP")
-                                color: root.surfaceInk
-                                font.pixelSize: 26
-                            }
-                        }
-                    }
-                }
-
-                BodyText {
-                    Layout.alignment: Qt.AlignHCenter
-                    Layout.topMargin: -8
-                    text: Qt.formatDate(root.now, "dddd  •  d MMM").toUpperCase()
-                    font.pixelSize: 17
-                    font.weight: Font.DemiBold
-                }
-
-                Item {
-                    Layout.alignment: Qt.AlignHCenter
-                    Layout.topMargin: 26
-                    Layout.bottomMargin: 22
-                    implicitWidth: 230
-                    implicitHeight: 180
-
-                    MaterialShape {
-                        anchors.centerIn: parent
-                        implicitSize: 220
-                        shape: MaterialShape.ClamShell
-                        color: root.primaryContainer
-                    }
-                    MaterialGlyph {
-                        anchors.centerIn: parent
-                        text: "person"
-                        color: root.surfaceInk
-                        font.pixelSize: 94
-                        weight: 350
-                    }
-                }
-
-                Rectangle {
-                    Layout.alignment: Qt.AlignHCenter
-                    implicitWidth: Math.min(370, dashboard.width * 0.29)
-                    implicitHeight: 52
-                    radius: 26
-                    color: root.surfaceContainerHigh
-                    border.width: passwordField.activeFocus ? 2 : 0
-                    border.color: root.primaryColour
-
-                    RowLayout {
-                        anchors.fill: parent
-                        anchors.margins: 6
-                        spacing: 8
-
-                        MaterialGlyph {
-                            Layout.leftMargin: 8
-                            text: root.auth.authenticating ? "progress_activity" : "lock"
-                            color: root.surfaceMuted
-                            font.pixelSize: 21
-
-                            RotationAnimation on rotation {
-                                running: root.auth.authenticating
-                                from: 0
-                                to: 360
-                                duration: 900
-                                loops: Animation.Infinite
-                            }
-                        }
-
-                        TextInput {
-                            id: passwordField
-
-                            Layout.fillWidth: true
-                            Layout.fillHeight: true
-                            enabled: !root.auth.authenticating && root.primary
-                            color: root.surfaceInk
-                            selectionColor: root.primaryContainer
-                            selectedTextColor: root.surfaceInk
-                            font.family: root.bodyFont
-                            font.pixelSize: 15
-                            font.weight: Font.Medium
-                            echoMode: TextInput.Password
-                            passwordCharacter: "●"
-                            verticalAlignment: TextInput.AlignVCenter
-                            clip: true
-                            onAccepted: root.submitPassword()
-
-                            BodyText {
-                                anchors.fill: parent
-                                text: root.primary ? (root.auth.authenticating ? "Authenticating..." : "Enter your password") : "Use the primary display"
-                                color: root.outline
-                                font.pixelSize: 15
-                                verticalAlignment: Text.AlignVCenter
-                                visible: passwordField.text.length === 0
-                            }
-                        }
-
-                        Rectangle {
-                            Layout.preferredWidth: 40
-                            Layout.preferredHeight: 40
-                            radius: 20
-                            color: passwordField.text.length > 0 ? root.primaryColour : root.surfaceContainerHighest
-
-                            MaterialGlyph {
-                                anchors.centerIn: parent
-                                text: "arrow_forward"
-                                color: passwordField.text.length > 0 ? root.primaryInk : root.surfaceMuted
-                                font.pixelSize: 22
-                                weight: 600
-                            }
-                            MouseArea {
-                                anchors.fill: parent
-                                enabled: root.primary && passwordField.text.length > 0 && !root.auth.authenticating
-                                cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
-                                onClicked: root.submitPassword()
-                            }
-                        }
-                    }
-                }
-
-                BodyText {
-                    Layout.alignment: Qt.AlignHCenter
-                    Layout.topMargin: 10
-                    Layout.maximumWidth: 380
-                    text: root.auth.errorMessage
-                    color: root.error
-                    font.pixelSize: 13
-                    horizontalAlignment: Text.AlignHCenter
-                    wrapMode: Text.Wrap
-                    visible: text.length > 0
-                }
-
-                BodyText {
-                    Layout.alignment: Qt.AlignHCenter
-                    Layout.topMargin: 4
-                    text: root.auth.username.length > 0 ? root.auth.username : "User is not configured"
-                    color: root.surfaceMuted
-                    font.family: root.monoFont
-                    font.pixelSize: 12
-                }
-
-                Item {
-                    Layout.fillHeight: true
-                }
+                theme: root.theme
+                auth: root.auth
+                screenHeight: root.height
+                now: root.now
+                primary: root.primary
             }
 
             ColumnLayout {
-                Layout.preferredWidth: dashboard.width * 0.275
+                Layout.fillWidth: true
                 Layout.fillHeight: true
-                spacing: 12
+                spacing: root.theme.spacingMedium
 
-                RowLayout {
+                Card {
                     Layout.fillWidth: true
-                    Layout.preferredHeight: 124
-                    spacing: 9
+                    Layout.preferredHeight: resourceRow.implicitHeight + root.theme.spacingLarge * 2
+                    radius: 28
 
-                    StatShape {
-                        Layout.fillWidth: true
-                        icon: "device_thermostat"
-                        value: `${root.cpuTemp}°`
-                        label: "CPU"
-                        accent: "#f4c642"
-                        shapeType: MaterialShape.Pentagon
-                    }
-                    StatShape {
-                        Layout.fillWidth: true
-                        icon: "memory"
-                        value: `${root.memoryPercent}%`
-                        label: "RAM"
-                        accent: "#e19c4c"
-                        shapeType: MaterialShape.Cookie4Sided
-                    }
-                    StatShape {
-                        Layout.fillWidth: true
-                        icon: "hard_drive"
-                        value: `${root.diskPercent}%`
-                        label: "DISK"
-                        accent: "#b1ad6a"
-                        shapeType: MaterialShape.Gem
+                    RowLayout {
+                        id: resourceRow
+
+                        anchors.fill: parent
+                        anchors.margins: root.theme.spacingLarge
+                        spacing: root.theme.spacingLarge
+
+                        ResourceShape {
+                            Layout.fillWidth: true
+                            icon: "device_thermostat"
+                            value: `${root.cpuTemp}°`
+                            colour: root.theme.primary
+                            shapeColour: "#f4c642"
+                            shapeType: MaterialShape.Pentagon
+                        }
+                        ResourceShape {
+                            Layout.fillWidth: true
+                            icon: "memory_alt"
+                            value: `${root.memoryPercent}%`
+                            colour: root.theme.tertiary
+                            shapeColour: "#e19c4c"
+                            shapeType: MaterialShape.Slanted
+                        }
+                        ResourceShape {
+                            Layout.fillWidth: true
+                            icon: "hard_disk"
+                            value: `${root.diskPercent}%`
+                            colour: root.theme.secondary
+                            shapeColour: "#b1ad6a"
+                            shapeType: MaterialShape.Gem
+                        }
                     }
                 }
 
                 Card {
                     Layout.fillWidth: true
                     Layout.fillHeight: true
-                    radius: 10
+                    radius: 12
+                    bottomRightRadius: 28
 
                     ColumnLayout {
                         anchors.fill: parent
-                        anchors.margins: 20
-                        spacing: 8
+                        anchors.margins: root.theme.spacingLarge
+                        spacing: root.theme.spacingMedium
 
                         SectionLabel {
-                            text: "STATUS"
-                        }
-                        Item {
-                            Layout.preferredHeight: 8
+                            text: qsTr("STATUS")
                         }
                         StatusRow {
                             icon: root.batteryStatus === "Charging" ? "battery_charging_full" : "battery_5_bar"
-                            title: "Battery"
+                            title: qsTr("Battery")
                             value: `${root.batteryPercent}%`
                             detail: root.batteryStatus
                             progress: Number(root.batteryPercent) / 100
                         }
                         StatusRow {
-                            icon: root.networkName === "Disconnected" ? "wifi_off" : "wifi"
-                            title: "Network"
-                            value: root.networkName === "Disconnected" ? "Offline" : "Online"
+                            icon: root.networkName === qsTr("Disconnected") ? "wifi_off" : "wifi"
+                            title: qsTr("Network")
+                            value: root.networkName === qsTr("Disconnected") ? qsTr("Offline") : qsTr("Online")
                             detail: root.networkName
-                            progress: root.networkName === "Disconnected" ? 0 : 1
+                            progress: root.networkName === qsTr("Disconnected") ? 0 : 1
                         }
                         StatusRow {
                             icon: "schedule"
-                            title: "Uptime"
+                            title: qsTr("Uptime")
                             value: root.uptimeText
                             detail: root.hostName
                             progress: -1
@@ -556,6 +426,139 @@ FocusScope {
                 }
             }
         }
+
+        MaterialGlyph {
+            id: lockIcon
+
+            anchors.centerIn: parent
+            text: "lock"
+            color: root.theme.surfaceText
+            font.pointSize: 144
+            font.weight: Font.Bold
+            rotation: 180
+        }
+    }
+
+    SequentialAnimation {
+        id: initAnimation
+
+        running: true
+
+        ParallelAnimation {
+            StandardLargeAnimation {
+                target: backgroundLayer
+                property: "opacity"
+                from: 0
+                to: 1
+            }
+            FastSpatialAnimation {
+                target: dashboard
+                property: "scale"
+                from: 0
+                to: 1
+            }
+            FastSpatialAnimation {
+                target: dashboard
+                property: "rotation"
+                from: 180
+                to: 360
+            }
+        }
+        ParallelAnimation {
+            SpatialAnimation {
+                target: dashboard
+                property: "implicitWidth"
+                to: root.panelWidth
+            }
+            SpatialAnimation {
+                target: dashboard
+                property: "implicitHeight"
+                to: root.panelHeight
+            }
+            SpatialAnimation {
+                target: dashboard
+                property: "radius"
+                to: 42
+            }
+            SpatialAnimation {
+                target: dashboardContent
+                property: "scale"
+                to: 1
+            }
+            EffectAnimation {
+                target: dashboardContent
+                property: "opacity"
+                to: 1
+            }
+            SpatialAnimation {
+                target: lockIcon
+                property: "rotation"
+                to: 360
+            }
+            EffectAnimation {
+                target: lockIcon
+                property: "opacity"
+                to: 0
+            }
+        }
+        ScriptAction {
+            script: {
+                if (root.primary)
+                    center.forcePasswordFocus();
+            }
+        }
+    }
+
+    SequentialAnimation {
+        id: exitAnimation
+
+        onFinished: {
+            if (root.primary)
+                root.auth.launchSession();
+        }
+
+        ParallelAnimation {
+            SpatialAnimation {
+                target: dashboardContent
+                property: "scale"
+                to: 0
+            }
+            EffectAnimation {
+                target: dashboardContent
+                property: "opacity"
+                to: 0
+            }
+            SpatialAnimation {
+                target: dashboard
+                property: "implicitWidth"
+                to: root.compactSize
+            }
+            SpatialAnimation {
+                target: dashboard
+                property: "implicitHeight"
+                to: root.compactSize
+            }
+            SpatialAnimation {
+                target: dashboard
+                property: "radius"
+                to: root.compactSize / 4
+            }
+            EffectAnimation {
+                target: lockIcon
+                property: "opacity"
+                to: 1
+            }
+            StandardLargeAnimation {
+                target: backgroundLayer
+                property: "opacity"
+                to: 0
+            }
+        }
+        EffectAnimation {
+            target: dashboard
+            property: "opacity"
+            to: 0
+        }
     }
 
     Process {
@@ -566,21 +569,6 @@ FocusScope {
 
         stdout: StdioCollector {
             onStreamFinished: root.updateSystemInfo(text)
-        }
-    }
-
-    Rectangle {
-        anchors.fill: parent
-        z: 1000
-        color: "black"
-        opacity: root.auth.handoff ? 1 : 0
-        visible: opacity > 0
-
-        Behavior on opacity {
-            NumberAnimation {
-                duration: 160
-                easing.type: Easing.OutCubic
-            }
         }
     }
 
@@ -602,32 +590,30 @@ FocusScope {
     }
 
     component Card: Rectangle {
-        color: root.surfaceContainer
-        border.width: 1
-        border.color: Qt.rgba(root.surfaceMuted.r, root.surfaceMuted.g, root.surfaceMuted.b, 0.06)
+        color: root.theme.surfaceContainer
     }
 
     component BodyText: Text {
-        color: root.surfaceInk
-        font.family: root.bodyFont
+        color: root.theme.surfaceText
         renderType: Text.NativeRendering
         textFormat: Text.PlainText
+        font.family: root.theme.sansFont
+        font.pointSize: 12
+        font.variableAxes: ({"ROND": 25})
     }
 
-    component DisplayText: BodyText {
-        color: root.primaryColour
-        font.weight: 700
-        font.variableAxes: ({
-                "wdth": 30,
-                "ROND": 20
-            })
+    component MonoText: BodyText {
+        font.family: root.theme.monoFont
     }
 
-    component MaterialGlyph: BodyText {
+    component MaterialGlyph: Text {
         property real fill
         property int weight: 400
 
-        font.family: root.iconFont
+        color: root.theme.surfaceText
+        renderType: Text.NativeRendering
+        font.family: root.theme.iconFont
+        font.pointSize: 18
         font.variableAxes: ({
                 "FILL": fill,
                 "wght": weight,
@@ -635,120 +621,112 @@ FocusScope {
             })
     }
 
-    component SectionLabel: BodyText {
+    component SectionLabel: MonoText {
         Layout.fillWidth: true
-        color: root.surfaceMuted
-        font.family: root.monoFont
-        font.pixelSize: 13
-        font.weight: Font.Bold
+        color: root.theme.outline
+        font.weight: Font.Medium
     }
 
     component FetchLine: RowLayout {
         required property string label
         required property string value
+        spacing: root.theme.spacingSmall
 
-        spacing: 6
-
-        BodyText {
+        MonoText {
             text: `${parent.label}:`
-            color: root.surfaceMuted
-            font.family: root.monoFont
-            font.pixelSize: 13
+            color: root.theme.surfaceVariantText
             font.weight: Font.Bold
         }
-        BodyText {
+        MonoText {
             Layout.fillWidth: true
             text: parent.value
-            font.family: root.monoFont
-            font.pixelSize: 13
             elide: Text.ElideRight
         }
     }
 
     component PowerAction: Column {
-        id: powerAction
+        id: action
 
         required property string icon
         required property string label
         required property var command
         property bool danger
+        spacing: root.theme.spacingExtraSmall
 
-        spacing: 5
-
-        Rectangle {
+        MaterialShape {
             anchors.horizontalCenter: parent.horizontalCenter
-            width: 50
-            height: 42
-            radius: 13
-            color: powerAction.danger ? Qt.rgba(root.error.r, root.error.g, root.error.b, 0.22) : root.surfaceContainerHigh
+            implicitSize: 48
+            shape: MaterialShape.Cookie4Sided
+            color: action.danger ? Qt.alpha(root.theme.error, 0.22) : root.theme.surfaceContainerHigh
+            scale: actionMouse.pressed ? 0.78 : actionMouse.containsMouse ? 0.9 : 1
+
+            Behavior on scale {
+                FastSpatialAnimation {}
+            }
 
             MaterialGlyph {
                 anchors.centerIn: parent
-                text: powerAction.icon
-                color: powerAction.danger ? root.error : root.surfaceMuted
-                font.pixelSize: 22
+                text: action.icon
+                color: action.danger ? root.theme.error : root.theme.surfaceVariantText
             }
             MouseArea {
+                id: actionMouse
+
                 anchors.fill: parent
                 hoverEnabled: true
                 cursorShape: Qt.PointingHandCursor
-                onClicked: Quickshell.execDetached(powerAction.command)
+                onClicked: Quickshell.execDetached(action.command)
             }
         }
         BodyText {
             anchors.horizontalCenter: parent.horizontalCenter
-            text: powerAction.label
-            color: powerAction.danger ? root.error : root.surfaceMuted
-            font.pixelSize: 11
+            text: action.label
+            color: action.danger ? root.theme.error : root.theme.surfaceVariantText
+            font.pointSize: 11
         }
     }
 
-    component StatShape: Item {
-        id: statShape
+    component ResourceShape: Item {
+        id: resource
 
         required property string icon
         required property string value
-        required property string label
-        required property color accent
+        required property color colour
+        required property color shapeColour
         required property int shapeType
-        Layout.preferredHeight: 124
+        implicitHeight: width
 
         MaterialShape {
             anchors.centerIn: parent
-            implicitSize: Math.min(parent.width, parent.height) - 4
-            shape: statShape.shapeType
-            color: statShape.accent
+            implicitSize: resource.width
+            shape: resource.shapeType
+            color: resource.shapeColour
         }
-        Column {
+        ColumnLayout {
             anchors.centerIn: parent
+            spacing: -root.theme.spacingExtraSmall
 
             MaterialGlyph {
-                anchors.horizontalCenter: parent.horizontalCenter
-                text: statShape.icon
-                color: root.primaryInk
-                font.pixelSize: 21
-                fill: 1
+                Layout.alignment: Qt.AlignHCenter
+                text: resource.icon
+                color: root.theme.primaryText
             }
             BodyText {
-                anchors.horizontalCenter: parent.horizontalCenter
-                text: statShape.value
-                color: root.primaryInk
-                font.pixelSize: statShape.value.length > 4 ? 12 : 19
-                font.weight: Font.Bold
-            }
-            BodyText {
-                anchors.horizontalCenter: parent.horizontalCenter
-                text: statShape.label
-                color: Qt.rgba(root.primaryInk.r, root.primaryInk.g, root.primaryInk.b, 0.78)
-                font.family: root.monoFont
-                font.pixelSize: 9
-                font.weight: Font.Bold
+                Layout.alignment: Qt.AlignHCenter
+                text: resource.value
+                color: resource.colour
+                font.pointSize: 24
+                font.weight: Font.Medium
+                font.variableAxes: ({
+                        "wdth": 50,
+                        "ROND": 25
+                    })
             }
         }
     }
 
     component StatusRow: Rectangle {
-        id: statusRow
+        id: status
 
         required property string icon
         required property string title
@@ -757,19 +735,18 @@ FocusScope {
         required property real progress
         Layout.fillWidth: true
         Layout.preferredHeight: 88
-
         radius: 12
-        color: root.surfaceContainerHigh
+        color: root.theme.surfaceContainerHigh
 
         RowLayout {
             anchors.fill: parent
-            anchors.margins: 13
-            spacing: 12
+            anchors.margins: root.theme.spacingMedium
+            spacing: root.theme.spacingMedium
 
             MaterialGlyph {
-                text: statusRow.icon
-                color: root.primaryColour
-                font.pixelSize: 27
+                text: status.icon
+                color: root.theme.primary
+                font.pointSize: 20
                 fill: 1
             }
             ColumnLayout {
@@ -780,23 +757,20 @@ FocusScope {
                     Layout.fillWidth: true
                     BodyText {
                         Layout.fillWidth: true
-                        text: statusRow.title
-                        font.pixelSize: 15
+                        text: status.title
+                        font.pointSize: 14
                         font.weight: Font.DemiBold
                     }
-                    BodyText {
-                        text: statusRow.value
-                        color: root.primaryColour
-                        font.family: root.monoFont
-                        font.pixelSize: 13
+                    MonoText {
+                        text: status.value
+                        color: root.theme.primary
                         font.weight: Font.Bold
                     }
                 }
                 BodyText {
                     Layout.fillWidth: true
-                    text: statusRow.detail
-                    color: root.outline
-                    font.pixelSize: 12
+                    text: status.detail
+                    color: root.theme.outline
                     elide: Text.ElideRight
                 }
                 Rectangle {
@@ -804,17 +778,40 @@ FocusScope {
                     Layout.topMargin: 3
                     Layout.preferredHeight: 4
                     radius: 2
-                    color: root.surfaceContainerHighest
-                    visible: statusRow.progress >= 0
+                    color: root.theme.surfaceContainerHighest
+                    visible: status.progress >= 0
 
                     Rectangle {
-                        width: parent.width * Math.max(0, Math.min(1, statusRow.progress))
+                        width: parent.width * Math.max(0, Math.min(1, status.progress))
                         height: parent.height
                         radius: parent.radius
-                        color: root.primaryColour
+                        color: root.theme.primary
                     }
                 }
             }
         }
+    }
+
+    component SpatialAnimation: NumberAnimation {
+        duration: root.theme.durationDefaultSpatial
+        easing.type: Easing.BezierSpline
+        easing.bezierCurve: [0.38, 1.21, 0.22, 1, 1, 1]
+    }
+
+    component FastSpatialAnimation: NumberAnimation {
+        duration: root.theme.durationFastSpatial
+        easing.type: Easing.BezierSpline
+        easing.bezierCurve: [0.42, 1.67, 0.21, 0.9, 1, 1]
+    }
+
+    component EffectAnimation: NumberAnimation {
+        duration: root.theme.durationDefaultEffects
+        easing.type: Easing.BezierSpline
+        easing.bezierCurve: [0.34, 0.8, 0.34, 1, 1, 1]
+    }
+
+    component StandardLargeAnimation: NumberAnimation {
+        duration: root.theme.durationLarge
+        easing.type: Easing.OutCubic
     }
 }

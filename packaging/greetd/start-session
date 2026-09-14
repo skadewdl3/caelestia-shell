@@ -7,4 +7,4 @@ if [[ -c /dev/tty ]]; then
 fi
 
 desktop="${CAELESTIA_GREETER_SESSION_DESKTOP:-hyprland.desktop}"
-exec uwsm start -e -D Hyprland "$desktop" </dev/null >/dev/null 2>&1
+exec systemd-cat -t caelestia-session uwsm start -e -D Hyprland -- "$desktop" </dev/null

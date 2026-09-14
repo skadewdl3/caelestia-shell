@@ -11,6 +11,25 @@ if [[ -r "$config_file" ]]; then
     set +a
 fi
 
+# wlroots parses WLR_DRM_DEVICES as a colon-separated list. Persistent PCI
+# symlinks contain colons, so resolve the configured device before exporting it.
+if [[ -n "${CAELESTIA_GREETER_DRM_DEVICE:-}" ]]; then
+    resolved_drm_device=""
+    for _ in {1..50}; do
+        if resolved_drm_device="$(readlink -e -- "$CAELESTIA_GREETER_DRM_DEVICE" 2>/dev/null)"; then
+            break
+        fi
+        sleep 0.1
+    done
+
+    if [[ -z "$resolved_drm_device" ]]; then
+        printf 'Could not resolve CAELESTIA_GREETER_DRM_DEVICE=%s.\n' \
+            "$CAELESTIA_GREETER_DRM_DEVICE" >&2
+        exit 1
+    fi
+    export WLR_DRM_DEVICES="$resolved_drm_device"
+fi
+
 export HOME="${CAELESTIA_GREETER_HOME:-/var/lib/caelestia-greeter}"
 export XDG_CACHE_HOME="${CAELESTIA_GREETER_CACHE_HOME:-/var/cache/caelestia-greeter}"
 export XDG_CONFIG_HOME="${CAELESTIA_GREETER_CONFIG_HOME:-/etc/caelestia-greeter}"
@@ -36,4 +55,4 @@ if [[ -c /dev/tty ]]; then
     printf '\033[40m\033[2J\033[3J\033[H\033[?25l' > /dev/tty 2>/dev/null || true
 fi
 
-exec cage -s -- qs -p "$CAELESTIA_GREETER_QML" </dev/null >/dev/null 2>&1
+exec systemd-cat -t caelestia-greeter cage -s -- qs -p "$CAELESTIA_GREETER_QML" </dev/null
