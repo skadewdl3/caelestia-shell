@@ -11,7 +11,6 @@ concurrency:
 
 permissions:
   contents: write
-  issues: write
   pull-requests: write
 
 jobs:
@@ -99,9 +98,9 @@ jobs:
 
           body=$(printf '%s\n\n%s\n\n%s\n%s\n' \
             "Rebases the maintained patch stack from $CURRENT_TAG onto upstream $TARGET_TAG." \
-            "Review the checks and the two-tree diff locally with: git diff origin/main..$UPDATE_BRANCH" \
+            "Review the two-tree diff locally with: git diff origin/main..$UPDATE_BRANCH" \
             "Do **not** use GitHub's merge, squash, or rebase buttons for this PR." \
-            "After checks pass, run the **Promote upstream update** workflow with this PR number.")
+            "After review, run the **Promote upstream update** workflow with this PR number.")
           gh pr create \
             --base main \
             --head "$UPDATE_BRANCH" \
@@ -111,21 +110,14 @@ jobs:
       - name: Report a conflicting update
         if: steps.rebase.outcome == 'failure'
         env:
-          GH_TOKEN: ${{ github.token }}
           CURRENT_TAG: ${{ steps.check.outputs.current_tag }}
           TARGET_TAG: ${{ steps.check.outputs.target_tag }}
           CONFLICT_FILES: ${{ steps.rebase.outputs.conflict_files }}
         run: |
-          title="Upstream update to $TARGET_TAG needs manual rebase"
-          issue=$(gh issue list --state open --search "$title in:title" --json number,title \
-            --jq ".[] | select(.title == \"$title\") | .number" | head -n1)
-          body=$(printf '%s\n\n%s\n\n```text\n%s\n```\n\n%s\n' \
-            "The automatic rebase from $CURRENT_TAG onto $TARGET_TAG conflicted." \
-            "Conflicting paths:" "$CONFLICT_FILES" \
-            "Run scripts/update-upstream $TARGET_TAG locally, resolve the rebase, push update/$TARGET_TAG, and rerun this workflow to open the review PR.")
-          if [[ -n "$issue" ]]; then
-            gh issue edit "$issue" --body "$body"
-          else
-            gh issue create --title "$title" --body "$body"
-          fi
+          {
+            printf '## Upstream update needs a manual rebase\n\n'
+            printf 'The automatic rebase from `%s` onto `%s` conflicted.\n\n' "$CURRENT_TAG" "$TARGET_TAG"
+            printf 'Conflicting paths: `%s`\n\n' "$CONFLICT_FILES"
+            printf 'Run `scripts/update-upstream %s` locally, resolve the rebase, push `update/%s`, and rerun this workflow to open the review PR.\n' "$TARGET_TAG" "$TARGET_TAG"
+          } >> "$GITHUB_STEP_SUMMARY"
           exit 1
