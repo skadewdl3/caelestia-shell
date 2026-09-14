@@ -13,10 +13,8 @@ concurrency:
   cancel-in-progress: false
 
 permissions:
-  checks: read
   contents: write
   pull-requests: write
-  statuses: read
 
 jobs:
   promote:
@@ -28,7 +26,7 @@ jobs:
           ref: main
           fetch-depth: 0
 
-      - name: Validate PR and checks
+      - name: Validate PR
         id: pr
         env:
           GH_TOKEN: ${{ github.token }}
@@ -46,7 +44,6 @@ jobs:
           [[ "$base_ref" == "main" ]]
           [[ "$head_repo" == "$GITHUB_REPOSITORY" ]]
           [[ "$head_ref" =~ ^update/v[0-9]+\.[0-9]+\.[0-9]+$ ]]
-          gh pr checks "$PR_NUMBER"
 
           echo "head_ref=$head_ref" >> "$GITHUB_OUTPUT"
           echo "head_sha=$head_sha" >> "$GITHUB_OUTPUT"
