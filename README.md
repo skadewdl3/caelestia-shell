@@ -151,7 +151,7 @@ After installing it:
 
 4. Confirm that another VT is usable, then enable `greetd.service` according to your distribution's instructions.
 
-The greeter uses the packaged wallpaper by default. Set `CAELESTIA_GREETER_BACKGROUND` in `/etc/caelestia-greeter/config` to a different system-readable image. It starts `hyprland.desktop` through UWSM by default; set `CAELESTIA_GREETER_SESSION_DESKTOP` to select another installed desktop entry.
+The greeter uses the packaged wallpaper and a built-in warm palette by default. Set `CAELESTIA_GREETER_BACKGROUND` in `/etc/caelestia-greeter/config` to a different system-readable image. To use the same colours as the desktop lock screen, copy Caelestia's `scheme.json` to a system-readable location and set `CAELESTIA_GREETER_SCHEME` to it. The greeter starts `hyprland.desktop` through UWSM by default; set `CAELESTIA_GREETER_SESSION_DESKTOP` to select another installed desktop entry. On multi-GPU systems, set `CAELESTIA_GREETER_DRM_DEVICE` to a persistent `/dev/dri/by-path/*-card` symlink; the launcher resolves it to the corresponding card node before starting Cage.
 
 Preview the greeter safely from the source checkout before changing the display manager:
 

@@ -6,3 +6,12 @@ CAELESTIA_GREETER_SESSION_DESKTOP=hyprland.desktop
 
 # Optional: a system-readable wallpaper. The packaged Caelestia wallpaper is the default.
 # CAELESTIA_GREETER_BACKGROUND=/usr/share/backgrounds/my-wallpaper.jpg
+
+# Optional: a system-readable Caelestia scheme.json. Without this, the greeter uses
+# its built-in warm fallback palette.
+# CAELESTIA_GREETER_SCHEME=/etc/caelestia-greeter/scheme.json
+
+# Optional: a persistent DRM card path for multi-GPU systems. The wrapper
+# resolves this before exporting WLR_DRM_DEVICES because wlroots uses colons as
+# separators and PCI paths contain colons.
+# CAELESTIA_GREETER_DRM_DEVICE=/dev/dri/by-path/pci-0000:65:00.0-card
