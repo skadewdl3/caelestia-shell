@@ -80,6 +80,6 @@ jobs:
           PR_NUMBER: ${{ inputs.pr_number }}
           HEAD_REF: ${{ steps.pr.outputs.head_ref }}
         run: |
-          gh pr comment "$PR_NUMBER" --body "Promoted the exact tested commit to main with force-with-lease."
-          gh pr close "$PR_NUMBER" || true
+          gh pr comment --repo "$GITHUB_REPOSITORY" "$PR_NUMBER" --body "Promoted the exact tested commit to main with force-with-lease."
+          gh pr close --repo "$GITHUB_REPOSITORY" "$PR_NUMBER" || true
           git push origin --delete "$HEAD_REF"
